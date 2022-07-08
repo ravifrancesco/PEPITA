@@ -9,7 +9,16 @@ from Preprocess.augment import Cutout, CIFAR10Policy
 DIR = {'CIFAR10': 'E:\datasets', 'CIFAR100': 'E:\datasets'}
 
 def get_cifar10(batch_size, augment=False, num_workers=8):
-    
+    r"""Return the training and testing dataloaders for CIFAR10
+
+    Args:
+        batchsize (int): the batchsize to be used
+        augment (bool, optional): if true, data augmentation is performed on the training dataloader (default is False)
+        num_workers (int, optional): the number of workers that is passed to the DataLoader class (default is 8)
+
+    Returns:
+        (DataLoader, DataLoader): training and testing dataloaders for CIFAR10
+    """
     if augment:
         trans_t = transforms.Compose([transforms.RandomCrop(32, padding=4),
                                       transforms.RandomHorizontalFlip(),
@@ -31,7 +40,16 @@ def get_cifar10(batch_size, augment=False, num_workers=8):
     return train_dataloader, test_dataloader
 
 def get_cifat100(batch_size, augment=False, num_workers=8):
+    r"""Return the training and testing dataloaders for CIFAR100
 
+    Args:
+        batchsize (int): the batchsize to be used
+        augment (bool, optional): if true, data augmentation is performed on the training dataloader (default is False)
+        num_workers (int, optional): the number of workers that is passed to the DataLoader class (default is 8)
+
+    Returns:
+        (DataLoader, DataLoader): training and testing dataloaders for CIFAR100
+    """
     if augment:
         trans_t = transforms.Compose([transforms.RandomCrop(32, padding=4),
                                     transforms.RandomHorizontalFlip(),

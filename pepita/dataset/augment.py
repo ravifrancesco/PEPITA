@@ -6,12 +6,18 @@ import torch
 # code from https://github.com/uoguelph-mlrg/Cutout/blob/master/util/cutout.py 
 # Improved Regularization of Convolutional Neural Networks with Cutout.
 class Cutout(object):
-    """Randomly mask out one or more patches from an image.
-    Args:
+    r"""Randomly mask out one or more patches from an image.
+
+    Attributes:
         n_holes (int): Number of patches to cut out of each image.
         length (int): The length (in pixels) of each square patch.
     """
     def __init__(self, n_holes, length):
+        r"""
+        Args:
+            n_holes (int): Number of patches to cut out of each image.
+            length (int): The length (in pixels) of each square patch.
+        """
         self.n_holes = n_holes
         self.length = length
 
@@ -19,6 +25,7 @@ class Cutout(object):
         """
         Args:
             img (Tensor): Tensor image of size (C, H, W).
+        
         Returns:
             Tensor: Image with n_holes of dimension length x length cut out of it.
         """
