@@ -2,13 +2,13 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import torch
 import os
-from Preprocess.augment import Cutout, CIFAR10Policy
+from dataset.augment import Cutout, CIFAR10Policy
 
 # code adapted from https://github.com/putshua/SNN_conversion_QCFS/blob/master/Preprocess/getdataloader.py
 
 DIR = {'CIFAR10': 'E:\datasets', 'CIFAR100': 'E:\datasets'}
 
-def get_cifar10(batch_size, augment=False, num_workers=8):
+def get_cifar10(batchsize, augment=False, num_workers=8):
     r"""Return the training and testing dataloaders for CIFAR10
 
     Args:
@@ -39,7 +39,7 @@ def get_cifar10(batch_size, augment=False, num_workers=8):
 
     return train_dataloader, test_dataloader
 
-def get_cifat100(batch_size, augment=False, num_workers=8):
+def get_cifar100(batchsize, augment=False, num_workers=8):
     r"""Return the training and testing dataloaders for CIFAR100
 
     Args:
