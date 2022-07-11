@@ -3,12 +3,14 @@ from torch.utils.data import DataLoader, Subset
 
 from sklearn.model_selection import train_test_split
 
+from loguru import logger
+
 from .augment import Cutout, CIFAR10Policy
 
 from ..core.config import DATASET_DIR
 
 def train_val_dataset(dataset, val_split=0.2):
-    """Splits the input dataset into train and validation datasets
+    r"""Splits the input dataset into train and validation datasets
 
     Args:
         dataset (torch.utils.data.Dataset): dataset to split
@@ -56,6 +58,8 @@ def get_cifar10(batchsize, val_split=0.2, augment=False, num_workers=8):
     val_dataloader = DataLoader(val_data, batch_size=batchsize, shuffle=False, num_workers=num_workers)
     test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=num_workers)
 
+    logger.info('Loaded CIFAR10 dataset')
+
     return train_dataloader, val_dataloader, test_dataloader
 
 def get_cifar100(batchsize, val_split=0.2, augment=False, num_workers=8):
@@ -88,5 +92,7 @@ def get_cifar100(batchsize, val_split=0.2, augment=False, num_workers=8):
     train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=num_workers, pin_memory=True)
     val_dataloader = DataLoader(val_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
     test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
+
+    logger.info('Loaded CIFAR100 dataset')
 
     return train_dataloader, val_dataloader, test_dataloader
