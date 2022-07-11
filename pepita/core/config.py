@@ -34,7 +34,6 @@ hparams.TRAINING.DROPOUT_P = 0.2
 hparams.TRAINING.VAL_SPLIT = 0.2
 hparams.TRAINING.BATCH_SIZE = 32
 hparams.TRAINING.AUGMENT = False
-hparams.TRAINING.OPTIMIZER = 'pepita'
 
 # PEPITA parameters
 hparams.PEPITA = CN()
