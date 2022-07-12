@@ -22,7 +22,7 @@ class Cutout(object):
         self.length = length
 
     def __call__(self, img):
-        """
+        r"""
         Args:
             img (Tensor): Tensor image of size (C, H, W).
         
@@ -132,7 +132,7 @@ class SubPolicy(object):
         return img
 
 class CIFAR10Policy(object):
-    """ Randomly choose one of the best 25 Sub-policies on CIFAR10.
+    r""" Randomly choose one of the best 25 Sub-policies on CIFAR10.
         Example:
         >>> policy = CIFAR10Policy()
         >>> transformed = policy(image)

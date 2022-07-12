@@ -1,3 +1,5 @@
+import numpy as np
+
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Subset
 
@@ -19,6 +21,9 @@ def train_val_dataset(dataset, val_split=0.2):
     Returns:
         (Dataset, Dataset): training and validation datasets
     """
+    if val_split == 0:
+        return dataset, None
+    
     train_idx, val_idx = train_test_split(list(range(len(dataset))), test_size=val_split)
     train_dataset = Subset(dataset, train_idx)
     val_dataset = Subset(dataset, val_idx)
@@ -54,9 +59,9 @@ def get_cifar10(batchsize, val_split=0.2, augment=False, num_workers=8):
     train_data = datasets.CIFAR10(DATASET_DIR['CIFAR10'], train=True, transform=trans_t, download=True)
     test_data = datasets.CIFAR10(DATASET_DIR['CIFAR10'], train=False, transform=trans, download=True)
     train_data, val_data = train_val_dataset(train_data, val_split=val_split)
-    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=num_workers)
-    val_dataloader = DataLoader(val_data, batch_size=batchsize, shuffle=False, num_workers=num_workers)
-    test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=num_workers)
+    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=num_workers, pin_memory=True)
+    val_dataloader = DataLoader(val_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
+    test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
 
     logger.info('Loaded CIFAR10 dataset')
 
