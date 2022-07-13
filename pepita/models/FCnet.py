@@ -30,7 +30,15 @@ def generate_layer(in_size, out_size, p=0.1):
 
 @torch.no_grad()
 def collect_activations(model, l):
-    # TODO doc
+    r"""Return hook for registering the given layer activations
+    
+    Args:
+        model (torch.nn.Module): model of which activations are collected
+        l (int): index of the layer of the model
+
+    Returns:
+        hook (callable): hook to collect the activations
+    """
     def hook(self, input, output):
         model.activations[l] = output.detach()
     return hook
@@ -53,7 +61,6 @@ def generate_B(n_in, n_out, B_mean_zero=True, Bstd=0.05):
     else:
         B = (torch.rand(n_in, n_out) * sd) * Bstd
         
-    #return B if not torch.cuda.is_available() else B.to('cuda')
     return B
 
 class FCNet(nn.Module):
@@ -117,7 +124,16 @@ class FCNet(nn.Module):
 
     @torch.no_grad()
     def update(self, x, e, lr, batch_size, first_block=True, last_block=True):
-        # TODO doc
+        r"""Updates the layers of the network according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
+
+        Args:
+            x (torch.Tensor): the network input
+            e (torch.Tensor): the error computed at the output after the first forward pass
+            lr (float): the learning rate
+            batch_size (int): the batch size
+            first_block (bool, optional): see https://arxiv.org/pdf/2201.11665.pdf for reference (default is True)
+            last_block (bool, optional): see https://arxiv.org/pdf/2201.11665.pdf for reference (default is True)
+        """
         if first_block:
             hl_err = x + (e @ self.B.T)
         else:

@@ -52,6 +52,7 @@ class PEPITATrainer(pl.LightningModule):
             logger.error(f'Model \'{self.hparams.MODEL}\' is undefined!')
             exit()
 
+        # Setting hyperparams
         self.lr = self.hparams.TRAINING.LR
         self.bs = self.hparams.TRAINING.BATCH_SIZE
         self.lr_decay = self.hparams.TRAINING.LR_DECAY
@@ -59,6 +60,7 @@ class PEPITATrainer(pl.LightningModule):
 
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
+        self.test_acc = torchmetrics.Accuracy()
 
     def forward(self, x):
         return self.model(x)
@@ -71,6 +73,8 @@ class PEPITATrainer(pl.LightningModule):
             outputs = self(imgs)
         
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
+
+            # Update model using the PEPITA learning rule
             self.model.update(imgs, outputs-one_hot, self.lr, self.bs)
 
             loss = F.cross_entropy(outputs, gt)
@@ -83,6 +87,7 @@ class PEPITATrainer(pl.LightningModule):
         return {'loss': loss, 'train_acc': self.train_acc, 'log': tensorboard_logs}
 
     def training_epoch_end(self, outputs):
+        # Scales LR according to the learning rate decay rule
         if self.current_epoch in self.hparams.TRAINING.DECAY_EPOCH:
             logger.info(f'Epoch {self.current_epoch} - Learning rate decay: {self.lr} -> {self.lr*self.lr_decay}')
             self.lr = self.lr*self.lr_decay
@@ -110,10 +115,12 @@ class PEPITATrainer(pl.LightningModule):
                 imgs = imgs.reshape(-1, self.input_size)
             outputs = self(imgs)
         
-            val_loss = F.cross_entropy(outputs, gt)   
-            tensorboard_logs = {'test_loss': val_loss}
+            test_loss = F.cross_entropy(outputs, gt)   
+            tensorboard_logs = {'test_loss': test_loss}
             self.log_dict(tensorboard_logs)
-            self.log("test_loss", val_loss)
+            self.log("test_loss", test_loss)
+            logger.info(f'Testing loss: {test_loss}')
+            logger.info(f'Testing acc: {self.test_acc}')
 
     def configure_optimizers(self):
         return None
