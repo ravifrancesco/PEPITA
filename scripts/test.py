@@ -27,16 +27,13 @@ def main(hparams):
     logger.info(f'Using device: {device}')
     logger.info(f'Hyperparameters: \n {hparams}')
 
-    model = PEPITATrainer(hparams=hparams).to(device)
-
-    
     logger.warning(f'Loading pretrained model from {hparams.MODEL_DIR}/model.ckpt')
-    model.load_from_checkpoint('{hparams.MODEL_DIR}/model.ckpt')
+    model = PEPITATrainer.load_from_checkpoint(f'{hparams.MODEL_DIR}/model.ckpt', hparams=hparams).to(device)
 
     # most basic trainer, uses good defaults (1 gpu)
     trainer = pl.Trainer(
         #gpus=1,
-        resume_from_checkpoint=hparams.TRAINING.RESUME,
+        #resume_from_checkpoint=hparams.TRAINING.RESUME,
         logger=None,
     )
 
