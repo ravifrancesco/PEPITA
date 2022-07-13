@@ -10,7 +10,7 @@ DATASET_DIR = {
 hparams = CN()
 
 # General settings
-hparams.EXP_NAME = 'fcnet_try1'
+hparams.EXP_NAME = 'fcnet_nodropout'
 hparams.MODEL_DIR = f'experiments/{hparams.EXP_NAME}/model'
 hparams.LOG_DIR = f'experiments/{hparams.EXP_NAME}/logs'
 hparams.MODEL_ARCH = 'fcnet'
@@ -19,11 +19,11 @@ hparams.SEED_VALUE = 42
 
 # Hardware
 hparams.HARDWARE = CN()
-hparams.HARDWARE.NUM_WORKERS = 8
+hparams.HARDWARE.NUM_WORKERS = 4
 
 # Training process hparams
 hparams.TRAINING = CN()
-hparams.TRAINING.MAX_EPOCHS = 1
+hparams.TRAINING.MAX_EPOCHS = 100
 hparams.TRAINING.CHECK_VAL_EVERY_N_EPOCH = 1
 hparams.TRAINING.DROPOUT_P = 0
 hparams.TRAINING.VAL_SPLIT = 0.0

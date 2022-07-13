@@ -18,8 +18,6 @@ from pepita.core.config import get_hparams_defaults
 def main(hparams, fast_dev_run=False):
     log_dir = hparams.LOG_DIR
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    logger.info(f'Using device: {device}')
-
     #set_seed(hparams.SEED_VALUE)
 
     logger.add(
@@ -28,6 +26,7 @@ def main(hparams, fast_dev_run=False):
         colorize=False,
     )
 
+    logger.info(f'Using device: {device}')
     logger.info(f'Hyperparameters: \n {hparams}')
 
     experiment_loggers = []

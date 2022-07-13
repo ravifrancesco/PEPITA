@@ -78,7 +78,7 @@ class PEPITATrainer(pl.LightningModule):
 
             tensorboard_logs = {'training_loss': loss, 'training_acc': self.train_acc}
             self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
-            self.log('loss', self.train_acc, on_step=False, on_epoch=True)
+            self.log('loss', loss, on_step=False, on_epoch=True)
 
         return {'loss': loss, 'train_acc': self.train_acc, 'log': tensorboard_logs}
 

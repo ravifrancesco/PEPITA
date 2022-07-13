@@ -53,7 +53,8 @@ def generate_B(n_in, n_out, B_mean_zero=True, Bstd=0.05):
     else:
         B = (torch.rand(n_in, n_out) * sd) * Bstd
         
-    return B if not torch.cuda.is_available() else B.to('cuda')
+    #return B if not torch.cuda.is_available() else B.to('cuda')
+    return B
 
 class FCNet(nn.Module):
     r"""Fully connected network
@@ -89,9 +90,9 @@ class FCNet(nn.Module):
         self.B = generate_B(layer_sizes[0], layer_sizes[-1], B_mean_zero=B_mean_zero, Bstd=Bstd)
         logger.info(f'Generated feedback matrix with shape {self.B.shape}')
         
-        if torch.cuda.is_available():
-            self.to('cuda')
-            logger.info(f'Feedback matrix moved to cuda')
+        # if torch.cuda.is_available():
+        #     self.to('cuda')
+        #     logger.info(f'Feedback matrix moved to cuda')
         
     @torch.no_grad()
     def get_activations(self):
