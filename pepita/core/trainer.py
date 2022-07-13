@@ -119,11 +119,15 @@ class PEPITATrainer(pl.LightningModule):
             outputs = self(imgs)
         
             test_loss = F.cross_entropy(outputs, gt)   
-            tensorboard_logs = {'test_loss': test_loss}
-            self.log_dict(tensorboard_logs)
+
             self.log("test_loss", test_loss)
-            logger.info(f'Testing loss: {test_loss}')
-            logger.info(f'Testing acc: {self.test_acc}')
+
+        return {'test_loss': test_loss, 'test_acc': self.test_acc}
+
+    def test_epoch_end(self, outputs):
+        avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
+        logger.info(f'Testing loss: {avg_loss}')
+        logger.info(f'Testing acc: {self.test_acc}')
 
     def configure_optimizers(self):
         return None
