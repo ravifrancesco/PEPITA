@@ -118,7 +118,8 @@ class PEPITATrainer(pl.LightningModule):
                 imgs = imgs.reshape(-1, self.input_size)
             outputs = self(imgs)
         
-            test_loss = F.cross_entropy(outputs, gt)   
+            test_loss = F.cross_entropy(outputs, gt)
+            self.test_acc(torch.argmax(outputs, -1), gt)   
 
             self.log("test_loss", test_loss)
 
