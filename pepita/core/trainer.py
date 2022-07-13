@@ -61,7 +61,6 @@ class PEPITATrainer(pl.LightningModule):
 
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
-        self.test_acc = torchmetrics.Accuracy()
 
     def forward(self, x):
         return self.model(x)
@@ -72,7 +71,7 @@ class PEPITATrainer(pl.LightningModule):
             if self.reshape:
                 imgs = imgs.reshape(-1, self.input_size)
             outputs = self(imgs)
-        
+
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
             # Update model using the PEPITA learning rule
@@ -92,15 +91,15 @@ class PEPITATrainer(pl.LightningModule):
         avg_loss = torch.stack([x['train_loss'] for x in outputs]).mean()
         tensorboard_logs = {'train_loss': avg_loss, 'train_acc': self.train_acc, 'step': self.current_epoch}
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
-    
+
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
             imgs, gt = batch
             if self.reshape:
                 imgs = imgs.reshape(-1, self.input_size)
             outputs = self(imgs)
-        
-            val_loss = F.cross_entropy(outputs, gt)   
+
+            val_loss = F.cross_entropy(outputs, gt)
             self.val_acc(torch.argmax(outputs, -1), gt)
 
         return {'val_loss': val_loss, 'val_acc': self.val_acc}
@@ -117,18 +116,17 @@ class PEPITATrainer(pl.LightningModule):
             if self.reshape:
                 imgs = imgs.reshape(-1, self.input_size)
             outputs = self(imgs)
-        
+
             test_loss = F.cross_entropy(outputs, gt)
-            self.test_acc(torch.argmax(outputs, -1), gt)   
+            n_correct_pred = torch.sum(torch.argmax(outputs, -1)==gt).item()
 
-            self.log("test_loss", test_loss)
-
-        return {'test_loss': test_loss, 'test_acc': self.test_acc}
+        return {'test_loss': test_loss, "n_correct_pred": n_correct_pred, "n_pred": len(gt)}
 
     def test_epoch_end(self, outputs):
         avg_loss = torch.stack([x['test_loss'] for x in outputs]).mean()
+        test_acc = sum([x['n_correct_pred'] for x in outputs]) / sum(x['n_pred'] for x in outputs)
         logger.info(f'Testing loss: {avg_loss}')
-        logger.info(f'Testing acc: {self.test_acc}')
+        logger.info(f'Testing acc: {test_acc}')
 
     def configure_optimizers(self):
         return None
