@@ -13,11 +13,14 @@ sys.path.append('')
 
 from pepita.core.trainer import PEPITATrainer
 from pepita.core.config import get_hparams_defaults
+from pepita.utils.train_utils import seed_everything
 
 def main(hparams, fast_dev_run=False):
+    
     log_dir = hparams.LOG_DIR
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    #TODO set_seed(hparams.SEED_VALUE)
+    
+    seed_everything(hparams.SEED_VALUE)
 
     logger.add(
         os.path.join(log_dir, 'train.log'),
