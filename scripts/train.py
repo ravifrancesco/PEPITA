@@ -1,4 +1,3 @@
-from distutils.log import info
 import os
 import sys
 import torch
@@ -18,7 +17,7 @@ from pepita.core.config import get_hparams_defaults
 def main(hparams, fast_dev_run=False):
     log_dir = hparams.LOG_DIR
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    #set_seed(hparams.SEED_VALUE)
+    #TODO set_seed(hparams.SEED_VALUE)
 
     logger.add(
         os.path.join(log_dir, 'train.log'),
