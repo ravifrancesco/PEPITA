@@ -10,7 +10,7 @@ DATASET_DIR = {
 hparams = CN()
 
 # General settings
-hparams.EXP_NAME = 'fcnet_nodropout'
+hparams.EXP_NAME = 'cifar10_fcnet_nodropout'
 hparams.MODEL_DIR = f'experiments/{hparams.EXP_NAME}/model'
 hparams.LOG_DIR = f'experiments/{hparams.EXP_NAME}/logs'
 hparams.MODEL_ARCH = 'fcnet'

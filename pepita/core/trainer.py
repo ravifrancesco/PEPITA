@@ -1,3 +1,4 @@
+from audioop import avg
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn.functional as F
@@ -80,17 +81,17 @@ class PEPITATrainer(pl.LightningModule):
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
 
-            tensorboard_logs = {'training_loss': loss, 'training_acc': self.train_acc}
-            self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
-            self.log('loss', loss, on_step=False, on_epoch=True)
-
-        return {'loss': loss, 'train_acc': self.train_acc, 'log': tensorboard_logs}
+        return {'train_loss': loss, 'train_acc': self.train_acc}
 
     def training_epoch_end(self, outputs):
         # Scales LR according to the learning rate decay rule
         if self.current_epoch in self.hparams.TRAINING.DECAY_EPOCH:
             logger.info(f'Epoch {self.current_epoch} - Learning rate decay: {self.lr} -> {self.lr*self.lr_decay}')
             self.lr = self.lr*self.lr_decay
+
+        avg_loss = torch.stack([x['train_loss'] for x in outputs]).mean()
+        tensorboard_logs = {'train_loss': avg_loss, 'train_acc': self.train_acc, 'step': self.current_epoch}
+        self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
     
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
@@ -102,11 +103,13 @@ class PEPITATrainer(pl.LightningModule):
             val_loss = F.cross_entropy(outputs, gt)   
             self.val_acc(torch.argmax(outputs, -1), gt)
 
-            tensorboard_logs = {'validation_loss': val_loss, 'validation_acc': self.val_acc}
-            self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
-            self.log("val_loss", self.val_acc, on_step=False, on_epoch=True)
+        return {'val_loss': val_loss, 'val_acc': self.val_acc}
 
-        return {'val_loss': val_loss, 'val_acc': self.val_acc, 'val_log': tensorboard_logs}
+    def validation_epoch_end(self, outputs):
+        avg_loss = torch.stack([x['val_loss'] for x in outputs]).mean()
+        tensorboard_logs = {'val_loss': avg_loss, 'val_acc': self.val_acc, 'step': self.current_epoch}
+        self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
+
 
     def test_step(self, batch, batch_idx):
         with torch.no_grad():
