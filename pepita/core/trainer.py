@@ -76,12 +76,6 @@ class PEPITATrainer(pl.LightningModule):
 
             # Update model using the PEPITA learning rule
             self.model.update(imgs, outputs-one_hot, self.lr, self.bs)
-            
-            # Reset Dropout Layers
-            try:
-                self.model.reset_dropout_masks()
-            except:
-                pass
 
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
