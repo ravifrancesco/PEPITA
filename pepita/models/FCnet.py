@@ -1,9 +1,13 @@
+import sys
+
 import numpy as np
 
 from loguru import logger
 
 import torch
 import torch.nn as nn
+
+from pepita.models.layers.ConsistentDropout import ConsistentDropout
 
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
 
@@ -20,7 +24,7 @@ def generate_layer(in_size, out_size, p=0.1):
         Fully connected block (nn.Sequential): fully connected block of the specified dimensions
     """
     w = nn.Linear(in_size, out_size, bias=False)
-    d = nn.Dropout(p=p)
+    d = ConsistentDropout(p=p)
     a = nn.ReLU()
     
     layer_limit = np.sqrt(6.0 / in_size)
@@ -109,6 +113,12 @@ class FCNet(nn.Module):
             activations (list[torch.Tensor]): the network activations
         """
         return [activations.clone() for activations in self.activations]
+
+    def reset_dropout_masks(self):
+        # TODO doc
+        for module in self.modules():
+            if module.__class__ is ConsistentDropout:
+                module.reset_mask()
         
     @torch.no_grad()        
     def forward(self, x):
