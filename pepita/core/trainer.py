@@ -9,8 +9,7 @@ import pytorch_lightning as pl
 
 from loguru import logger
 
-from pepita.models.FCnet import FCNet
-
+from pepita.models import modelpool
 from ..dataset import datapool, get_data_info
 from . import config
 
@@ -32,26 +31,10 @@ class PEPITATrainer(pl.LightningModule):
                 augment=self.hparams.TRAINING.AUGMENT, 
                 num_workers=self.hparams.HARDWARE.NUM_WORKERS
             )
-        img_w, n_ch, self.n_classes = get_data_info(self.hparams.DATASET)
 
         # Loading model
-        if self.hparams.MODEL_ARCH == 'fcnet':
-            from ..models import FCnet
-            self.input_size = img_w * img_w * n_ch
-            hidden_layers = self.hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES
-            self.output_size = self.n_classes
-            layers = [self.input_size] + hidden_layers + [self.output_size]
-            self.model = FCNet(
-                layers,
-                B_mean_zero=self.hparams.PEPITA.B_MEAN_ZERO, 
-                Bstd=self.hparams.PEPITA.BSTD,
-                p=self.hparams.TRAINING.DROPOUT_P
-            )
-            self.reshape = True
-            self.example_input_array = torch.rand((1, self.input_size))
-        else:
-            logger.error(f'Model \'{self.hparams.MODEL}\' is undefined!')
-            exit()
+        self.model, self.input_size, self.n_classes, self.reshape = modelpool(self.hparams.MODEL_ARCH, self.hparams)
+        self.example_input_array = torch.rand((1, self.input_size))
 
         # Setting hyperparams
         self.lr = self.hparams.TRAINING.LR
