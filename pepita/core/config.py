@@ -72,6 +72,7 @@ def update_hparams(hparams_file):
     """
     hparams = get_hparams_defaults()
     hparams.merge_from_file(hparams_file)
+    update_paths()
     return hparams.clone()
 
 def update_hparams_from_dict(cfg_dict):
