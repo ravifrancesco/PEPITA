@@ -58,15 +58,21 @@ class PEPITATrainer(pl.LightningModule):
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
             # Update model using the PEPITA learning rule
-            self.model.update(imgs, outputs-one_hot, self.lr, self.bs)
+            self.model.modulated_forward(imgs, outputs-one_hot, self.lr, self.bs)
 
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
+            
+            opt = self.optimizers()
+            opt.step()
+            opt.zero_grad()
 
         return {'train_loss': loss, 'train_acc': self.train_acc}
 
+
     def training_epoch_end(self, outputs):
-        # Scales LR according to the learning rate decay rule
+        # Scales LR according to the learning rate decay rule TODO use scheduler
+
         if self.current_epoch in self.hparams.TRAINING.DECAY_EPOCH:
             logger.info(f'Epoch {self.current_epoch} - Learning rate decay: {self.lr} -> {self.lr*self.lr_decay}')
             self.lr = self.lr*self.lr_decay
@@ -112,7 +118,8 @@ class PEPITATrainer(pl.LightningModule):
         logger.info(f'Testing acc: {test_acc}')
 
     def configure_optimizers(self):
-        return None
+        # TODO make changeable
+        return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9)
 
     def train_dataloader(self):
         return self.train_dataloader_v
