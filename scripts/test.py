@@ -45,7 +45,7 @@ def main(hparams):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('-e', '--exp_name', type=str, help='experiment name', required=True)
+    parser.add_argument('-en', '--exp_name', type=str, help='experiment name', required=True)
 
     args = parser.parse_args()
 
