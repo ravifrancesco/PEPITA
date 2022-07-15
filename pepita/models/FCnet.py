@@ -25,8 +25,9 @@ def generate_layer(in_size, out_size, p=0.1):
     d = ConsistentDropout(p=p)
     a = nn.ReLU()
     
-    layer_limit = np.sqrt(6.0 / in_size)
-    torch.nn.init.kaiming_uniform_(w.weight, mode='fan_in', nonlinearity='relu')
+    layer_limit = np.sqrt(6.0 / in_size) # TODO change initialization to include sqrt(6)
+    #torch.nn.init.kaiming_uniform_(w.weight, mode='fan_in', nonlinearity='relu')
+    torch.nn.init.uniform_(w.weight, a=-layer_limit, b=layer_limit)
     
     return nn.Sequential(w, d, a)
 
@@ -98,6 +99,7 @@ class FCNet(nn.Module):
             
         self.B = generate_B(layer_sizes[0], layer_sizes[-1], B_mean_zero=B_mean_zero, Bstd=Bstd)
         logger.info(f'Generated feedback matrix with shape {self.B.shape}')
+ 
         
         # if torch.cuda.is_available():
         #     self.to('cuda')
@@ -146,7 +148,7 @@ class FCNet(nn.Module):
             hl_err = x + (e @ self.B.T)
         else:
             hl_err = x
-        
+        # TODO add activations for forward and modulated
         forward_activations = self.get_activations()
         modulated_forward = self.forward(hl_err)
         modulated_activations = self.get_activations()
