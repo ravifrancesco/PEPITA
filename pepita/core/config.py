@@ -77,6 +77,11 @@ def update_hparams(hparams_file):
     return hparams.clone()
 
 def load_exp_hparams(exp_name):
+    """Handles loading of hparams for given experiment
+
+    Args:
+        exp_name (string): name of the experiment
+    """
     hparams.EXP_NAME = exp_name
     update_paths()
     hparams_file = os.path.join(hparams.CONFIG_PATH, 'config.yaml')
