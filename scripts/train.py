@@ -13,7 +13,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 sys.path.append('')
 
 from pepita.core.trainer import PEPITATrainer
-from pepita.core.config import get_hparams_defaults, update_hparams, update_hparams_from_cfg
+from pepita.core.config import get_hparams_defaults, update_hparams, update_hparams_from_cfg, save_config
 from pepita.utils.train_utils import seed_everything
 from utils import create_arg_cfg
 
@@ -73,6 +73,8 @@ def main(hparams, fast_dev_run=False):
         fast_dev_run=fast_dev_run,
         limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1
     )
+
+    save_config(hparams)
 
     logger.info('*** Started training ***')
     trainer.fit(model)
