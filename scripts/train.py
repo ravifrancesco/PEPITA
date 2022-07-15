@@ -1,5 +1,6 @@
 import os
 import sys
+from turtle import update
 import torch
 import argparse
 
@@ -12,8 +13,9 @@ from pytorch_lightning.loggers import TensorBoardLogger
 sys.path.append('')
 
 from pepita.core.trainer import PEPITATrainer
-from pepita.core.config import get_hparams_defaults
+from pepita.core.config import get_hparams_defaults, update_hparams, update_hparams_from_cfg
 from pepita.utils.train_utils import seed_everything
+from utils import create_arg_cfg
 
 def main(hparams, fast_dev_run=False):
     
@@ -81,13 +83,31 @@ def main(hparams, fast_dev_run=False):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--cfg', type=str, help='cfg file path')
-    parser.add_argument('--fdr', action='store_true', help='fast dev run')
+    parser.add_argument('-cfg', '--config_file', type=str, help='cfg file path')
+    parser.add_argument('-fdr', '--fast_dev_run', action='store_true', help='fast dev run')
+    parser.add_argument('-en', '--exp_name', type=str, default='exp', help="Experiment name")
+    parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
+    parser.add_argument('-d', '--dataset', type=str, default='cifar10', help="Dataset")
+    parser.add_argument('-s', '--seed', type=int, default=42, help="Seed value")
+    parser.add_argument('-w', '--workers', type=int, default=4, help="Number of workers")
+    parser.add_argument('-e', '--epochs', type=int, default=100, help="Number of epochs")
+    parser.add_argument('-dr', '--dropout', type=float, default=0.1, help="Dropout rate")
+    parser.add_argument('-v', '--val_split', type=float, default=0.0, help="Validation split")
+    parser.add_argument('-lr', '--learning_rate', type=float, default=0.01, help="Learning rate")
+    parser.add_argument('-bs', '--batch_size', type=int, default=64, help="Batch size")
+    parser.add_argument('-au', '--augment', action='store_true', help='Data augmentation')
+    parser.add_argument('-lrd', '--decay', type=float, default=0.1, help="Learning rate decay")
+    parser.add_argument('-de', '--decay_epoch', nargs='*', help='Learning rate decay epochs', default=[60,90])
+    parser.add_argument('-bm', '--b_mean_zero', action='store_false', help="Mean of B is 0")
+    parser.add_argument('-bstd', '--bstd', type=float, default=0.05, help="B standar deviation")
 
     args = parser.parse_args()
 
+    if args.config_file is not None:
+        hparams = update_hparams(args.config_file)
+    else:
+        hparams = update_hparams_from_cfg(create_arg_cfg(args))
+
     logger.info(f'Input arguments: \n {args}')
 
-    hparams = get_hparams_defaults()
-
-    main(hparams, fast_dev_run=args.fdr)
+    main(hparams, fast_dev_run=args.fast_dev_run)
