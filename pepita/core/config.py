@@ -73,7 +73,14 @@ def update_hparams(hparams_file):
     hparams = get_hparams_defaults()
     hparams.merge_from_file(hparams_file)
     update_paths()
+    logger.info(f'Loaded current configuration from {hparams.CONFIG_PATH}/config.yaml')
     return hparams.clone()
+
+def load_exp_hparams(exp_name):
+    hparams.EXP_NAME = exp_name
+    update_paths()
+    hparams_file = os.path.join(hparams.CONFIG_PATH, 'config.yaml')
+    return update_hparams(hparams_file)
 
 def update_hparams_from_cfg(cfg):
     """Return an updated yacs hparamsNode

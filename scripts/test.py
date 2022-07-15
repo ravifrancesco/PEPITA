@@ -10,7 +10,7 @@ import pytorch_lightning as pl
 sys.path.append('')
 
 from pepita.core.trainer import PEPITATrainer
-from pepita.core.config import get_hparams_defaults
+from pepita.core.config import load_exp_hparams
 
 def main(hparams):
 
@@ -45,12 +45,10 @@ def main(hparams):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--cfg', type=str, help='cfg file path')
+    parser.add_argument('-e', '--exp_name', type=str, help='experiment name', required=True)
 
     args = parser.parse_args()
 
-    logger.info(f'Input arguments: \n {args}')
-
-    hparams = get_hparams_defaults()
+    hparams = load_exp_hparams(args.exp_name)
 
     main(hparams)
