@@ -57,8 +57,11 @@ def get_hparams_defaults():
     """Get a yacs hparamsNode object with default values for my_project."""
     return hparams.clone()
 
-def update_paths():
+def update_paths(hparams):
     """Update hparams paths
+
+    Args:
+        hparams (CfgNode): params to update
     """
     hparams.MODEL_DIR = f'experiments/{hparams.EXP_NAME}/model'
     hparams.LOG_DIR = f'experiments/{hparams.EXP_NAME}/logs'
@@ -72,7 +75,7 @@ def update_hparams(hparams_file):
     """
     hparams = get_hparams_defaults()
     hparams.merge_from_file(hparams_file)
-    update_paths()
+    update_paths(hparams)
     logger.info(f'Loaded current configuration from {hparams.CONFIG_PATH}/config.yaml')
     return hparams.clone()
 
@@ -83,7 +86,7 @@ def load_exp_hparams(exp_name):
         exp_name (string): name of the experiment
     """
     hparams.EXP_NAME = exp_name
-    update_paths()
+    update_paths(hparams)
     hparams_file = os.path.join(hparams.CONFIG_PATH, 'config.yaml')
     return update_hparams(hparams_file)
 
@@ -95,7 +98,7 @@ def update_hparams_from_cfg(cfg):
     """
     hparams = get_hparams_defaults()
     hparams.merge_from_other_cfg(cfg)
-    update_paths()
+    update_paths(hparams)
     return hparams.clone()
 
 def save_config(hparams):
