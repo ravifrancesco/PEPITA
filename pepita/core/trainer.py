@@ -57,7 +57,7 @@ class PEPITATrainer(pl.LightningModule):
 
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
-            # Update model using the PEPITA learning rule
+            # Compute modulated activations
             self.model.modulated_forward(imgs, outputs-one_hot, self.lr, self.bs)
 
             loss = F.cross_entropy(outputs, gt)

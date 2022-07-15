@@ -134,8 +134,7 @@ class FCNet(nn.Module):
 
     @torch.no_grad()
     def modulated_forward(self, x, e, lr, batch_size, first_block=True, last_block=True):
-        r"""Updates the layers of the network according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
-        TODO change doc
+        r"""Updates the layers gradient according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
 
         Args:
             x (torch.Tensor): the network input
@@ -144,12 +143,15 @@ class FCNet(nn.Module):
             batch_size (int): the batch size
             first_block (bool, optional): see https://arxiv.org/pdf/2201.11665.pdf for reference (default is True)
             last_block (bool, optional): see https://arxiv.org/pdf/2201.11665.pdf for reference (default is True)
+        
+        Returns:
+            modulated_forward (torch.Tensor): modulated output
         """
         if first_block:
             hl_err = x + (e @ self.B.T)
         else:
             hl_err = x
-        # TODO add activations for forward and modulated
+
         forward_activations = self.get_activations()
         modulated_forward = self.forward(hl_err)
         modulated_activations = self.get_activations()
@@ -157,7 +159,7 @@ class FCNet(nn.Module):
         for l, layer in enumerate(self.layers):
             if (l == len(self.layers) - 1) and last_block:
                 dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
-                layer[0].weight -= lr * dwl / batch_size
+                layer[0].weight.grad = dwl / batch_size
             else:
                 dwl = (forward_activations[l] - modulated_activations[l]).T @ (modulated_activations[l - 1] if l != 0 else hl_err)
             layer[0].weight.grad = dwl / batch_size
