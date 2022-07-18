@@ -16,7 +16,6 @@ def main(hparams):
 
     log_dir = hparams.LOG_DIR
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    #TODO set_seed(hparams.SEED_VALUE)
 
     logger.add(
         os.path.join(log_dir, 'test.log'),
