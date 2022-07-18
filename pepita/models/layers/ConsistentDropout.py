@@ -51,7 +51,7 @@ class ConsistentDropout(nn.Module):
             mask (torch.Tensor): dropout mask
         """
         mask_shape = input.shape
-        mask = torch.empty(mask_shape, dtype=torch.bool).bernoulli_(1-self.p)
+        mask = torch.empty(mask_shape, dtype=torch.bool).bernoulli_(1-self.p) / (1-self.p)
         return mask
 
     def forward(self, input: torch.Tensor):
@@ -64,4 +64,4 @@ class ConsistentDropout(nn.Module):
                 self.mask = self._create_mask(input)
             return input*self.mask
         else:
-            return (1-self.p)*input
+            return input
