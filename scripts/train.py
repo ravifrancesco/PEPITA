@@ -71,7 +71,7 @@ def main(hparams, fast_dev_run=False):
         #resume_from_checkpoint=hparams.TRAINING.RESUME,
         num_sanity_val_steps=0,
         fast_dev_run=fast_dev_run,
-        limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1
+        #limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1 FIXME change
     )
 
     save_config(hparams)
@@ -102,6 +102,7 @@ if __name__ == '__main__':
     parser.add_argument('-de', '--decay_epoch', nargs='*', help='Learning rate decay epochs', default=[60,90])
     parser.add_argument('-bm', '--b_mean_zero', action='store_false', help="Mean of B is 0")
     parser.add_argument('-bstd', '--bstd', type=float, default=0.05, help="B standar deviation")
+    parser.add_argument('-n', '--normalize', action='store_true', help='normalize data')
 
     args = parser.parse_args()
 

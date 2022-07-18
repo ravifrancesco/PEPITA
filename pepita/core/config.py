@@ -40,6 +40,7 @@ hparams.TRAINING.BATCH_SIZE = 64
 hparams.TRAINING.AUGMENT = False
 hparams.TRAINING.LR_DECAY = 0.1
 hparams.TRAINING.DECAY_EPOCH = [60, 90]
+hparams.TRAINING.NORMALIZE = False
 
 # PEPITA parameters
 hparams.PEPITA = CN()

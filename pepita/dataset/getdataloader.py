@@ -31,7 +31,7 @@ def train_val_dataset(dataset, val_split=0.2):
 
 # code adapted from https://github.com/putshua/SNN_conversion_QCFS/blob/master/Preprocess/getdataloader.py
 
-def get_cifar10(batchsize, val_split=0.2, augment=False, num_workers=8):
+def get_cifar10(batchsize, val_split=0.2, augment=False, num_workers=8, normalize=False):
     r"""Return the training and testing dataloaders for CIFAR10
 
     Args:
@@ -39,22 +39,26 @@ def get_cifar10(batchsize, val_split=0.2, augment=False, num_workers=8):
         val_split (float, optional): validation split (defaul is 0.2)
         augment (bool, optional): if true, data augmentation is performed on the training dataloader (default is False)
         num_workers (int, optional): the number of workers that is passed to the DataLoader class (default is 8)
+        normalize (bool, optional): if True, normalization is applied (defaul is False)
 
     Returns:
         (DataLoader, DataLoader, DataLoader): training, validation and testing dataloaders for CIFAR10
     """
+
+    normalizer = (transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),) if normalize else ()
+
     if augment:
         trans_t = transforms.Compose([transforms.RandomCrop(32, padding=4),
                                       transforms.RandomHorizontalFlip(),
                                       CIFAR10Policy(),
                                       transforms.ToTensor(),
-                                      transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                                      *normalizer,
                                       Cutout(n_holes=1, length=16)
                                     ])
     else:
-        trans_t = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+        trans_t = transforms.Compose([transforms.ToTensor(), *normalizer])
     
-    trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))])
+    trans = transforms.Compose([transforms.ToTensor(), *normalizer])
 
     train_data = datasets.CIFAR10(DATASET_DIR['CIFAR10'], train=True, transform=trans_t, download=True)
     test_data = datasets.CIFAR10(DATASET_DIR['CIFAR10'], train=False, transform=trans, download=True)
@@ -67,7 +71,7 @@ def get_cifar10(batchsize, val_split=0.2, augment=False, num_workers=8):
 
     return train_dataloader, val_dataloader, test_dataloader
 
-def get_cifar100(batchsize, val_split=0.2, augment=False, num_workers=8):
+def get_cifar100(batchsize, val_split=0.2, augment=False, num_workers=8, normalize=False):
     r"""Return the training and testing dataloaders for CIFAR100
 
     Args:
@@ -75,21 +79,25 @@ def get_cifar100(batchsize, val_split=0.2, augment=False, num_workers=8):
         val_split (float, optional): validation split (defaul is 0.2)
         augment (bool, optional): if true, data augmentation is performed on the training dataloader (default is False)
         num_workers (int, optional): the number of workers that is passed to the DataLoader class (default is 8)
+        normalize (bool, optional): if True, normalization is applied (defaul is False)
 
     Returns:
         (DataLoader, DataLoader, DataLoader): training, validation and testing dataloaders for CIFAR100
     """
+
+    normalizer = (transforms.Normalize(mean=[n/255. for n in [129.3, 124.1, 112.4]], std=[n/255. for n in [68.2,  65.4,  70.4]]),) if normalize else ()
+
     if augment:
         trans_t = transforms.Compose([transforms.RandomCrop(32, padding=4),
                                     transforms.RandomHorizontalFlip(),
                                     transforms.ToTensor(),
-                                    transforms.Normalize(mean=[n/255. for n in [129.3, 124.1, 112.4]], std=[n/255. for n in [68.2,  65.4,  70.4]]),
+                                    *normalizer,
                                     Cutout(n_holes=1, length=16)
                                     ])
     else:
-        trans_t = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[n/255. for n in [129.3, 124.1, 112.4]], std=[n/255. for n in [68.2,  65.4,  70.4]])])
+        trans_t = transforms.Compose([transforms.ToTensor(), *normalizer])
     
-    trans = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=[n/255. for n in [129.3, 124.1, 112.4]], std=[n/255. for n in [68.2,  65.4,  70.4]])])
+    trans = transforms.Compose([transforms.ToTensor(), *normalizer])
 
     train_data = datasets.CIFAR100(DATASET_DIR['CIFAR100'], train=True, transform=trans_t, download=True)
     test_data = datasets.CIFAR100(DATASET_DIR['CIFAR100'], train=False, transform=trans, download=True)

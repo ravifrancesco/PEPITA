@@ -2,6 +2,7 @@ from audioop import avg
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import StepLR
 
 import torchmetrics
 
@@ -29,7 +30,8 @@ class PEPITATrainer(pl.LightningModule):
                 self.hparams.TRAINING.BATCH_SIZE,
                 val_split=self.hparams.TRAINING.VAL_SPLIT,
                 augment=self.hparams.TRAINING.AUGMENT, 
-                num_workers=self.hparams.HARDWARE.NUM_WORKERS
+                num_workers=self.hparams.HARDWARE.NUM_WORKERS,
+                normalize=self.hparams.TRAINING.NORMALIZE
             )
 
         # Loading model
@@ -71,11 +73,12 @@ class PEPITATrainer(pl.LightningModule):
 
 
     def training_epoch_end(self, outputs):
-        # Scales LR according to the learning rate decay rule TODO use scheduler
 
         if self.current_epoch in self.hparams.TRAINING.DECAY_EPOCH:
             logger.info(f'Epoch {self.current_epoch} - Learning rate decay: {self.lr} -> {self.lr*self.lr_decay}')
             self.lr = self.lr*self.lr_decay
+            opt = self.optimizers()
+            opt.param_groups[0]['lr'] = self.lr
 
         avg_loss = torch.stack([x['train_loss'] for x in outputs]).mean()
         tensorboard_logs = {'train_loss': avg_loss, 'train_acc': self.train_acc, 'step': self.current_epoch}
@@ -125,7 +128,8 @@ class PEPITATrainer(pl.LightningModule):
         return self.train_dataloader_v
     
     def val_dataloader(self):
-        return self.val_dataloader_v
+        #return self.val_dataloader_v FIXME change
+        return self.test_dataloader_v
 
     def test_dataloader(self):
         return self.test_dataloader_v
