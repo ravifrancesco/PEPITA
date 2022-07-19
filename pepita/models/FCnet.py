@@ -10,25 +10,47 @@ from pepita.models.layers.ConsistentDropout import ConsistentDropout
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
 
 @torch.no_grad()
-def generate_layer(in_size, out_size, p=0.1):
+def initialize_layer(layer, in_size, init='he_uniform'):
+    r"""Initializes layer according to the input init mode
+
+    Args:
+        layer (torch.Tensor): layer to initialize
+        in_size (int): layer input size
+        init (str, optional): initialization mode (default is 'he_uniform')
+    """
+    if init.lower()=='he_uniform':
+       layer_limit = np.sqrt(6.0 / in_size) 
+       torch.nn.init.uniform_(layer.weight, a=-layer_limit, b=layer_limit)
+    elif init.lower()=='he_normal':
+        layer_limit = np.sqrt(2.0 / in_size)
+        torch.nn.init.normal_(layer.weight, mean=0.0, std=layer_limit)
+    else:
+        logger.error(f'Initialization {init.lower()} not implemented yet')
+        exit()
+
+@torch.no_grad()
+def generate_layer(in_size, out_size, p=0.1, final_layer=False, init='he_uniform'):
     r"""Helper function to generate a Fully Connected block
 
     Args:
         in_size (int): input size
         out_size (int): output size
-        p (float): dropout rate (default is 0.1)
-    
+        p (float, optional): dropout rate (default is 0.1)
+        final_layer (bool, optional): if True, the layer is treated as final layer (default is False)
+        init (str, optional): initialization mode (default is 'he_uniform')
     Returns:
         Fully connected block (nn.Sequential): fully connected block of the specified dimensions
     """
     w = nn.Linear(in_size, out_size, bias=False)
-    d = ConsistentDropout(p=p)
-    a = nn.ReLU()
-    
-    layer_limit = np.sqrt(6.0 / in_size)
-    torch.nn.init.uniform_(w.weight, a=-layer_limit, b=layer_limit)
-    
-    return nn.Sequential(w, d, a)
+    initialize_layer(w, in_size, init)
+
+    if final_layer:
+        a = nn.Softmax(dim=1)
+        return nn.Sequential(w, a)
+    else:
+        d = ConsistentDropout(p=p)
+        a = nn.ReLU()
+        return nn.Sequential(w, d, a)
 
 @torch.no_grad()
 def collect_activations(model, l):
@@ -45,23 +67,30 @@ def collect_activations(model, l):
         model.activations[l] = output.detach()
     return hook
 
-def generate_B(n_in, n_out, B_mean_zero=True, Bstd=0.05):
+def generate_B(n_in, n_out, init='uniform', B_mean_zero=True, Bstd=0.05):
     r"""Helper function to generate the feedback matrix
 
     Args:
         n_in (int): network input size
         n_out (int): network output size
+        init (str, optional): initialization mode (default is 'uniform')
         B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
         Bstd (float, optional): standard deviation of the entries of the matrix (default is 0.05)
     
     Returns:
         Tensor (torch.Tensor): the feedback matrix
     """
-    sd = np.sqrt(6 / n_in)
-    if B_mean_zero:
-        B = (torch.rand(n_in, n_out) * 2 * sd - sd) * Bstd  # mean zero
+    if init.lower()=='uniform':
+        sd = np.sqrt(6.0 / n_in)
+        if B_mean_zero:
+            B = (torch.rand(n_in, n_out) * 2 * sd - sd) * Bstd
+        else:
+            B = (torch.rand(n_in, n_out) * sd) * Bstd
+    elif init.lower()=='normal':
+        sd = np.sqrt(2.0 / n_in)
+        B = torch.empty(n_in, n_out).normal_(mean=0,std=sd) * Bstd
     else:
-        B = (torch.rand(n_in, n_out) * sd) * Bstd
+        logger.error(f'B initialization \'{init.lower()}\' is not valid ')
         
     return B
 
@@ -73,10 +102,12 @@ class FCNet(nn.Module):
         B (torch.Tensor): feedback matrix
     """
     @torch.no_grad()
-    def __init__(self, layer_sizes, B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True):
+    def __init__(self, layer_sizes, init='he_uniform', B_init='uniform', B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True):
         r"""
         Args:
             layer_sizes (list[int]): sizes of each layers
+            init (str, optional): layer initialization mode (default is 'he_uniform')
+            B_init (str, optional): B initialization mode (default is 'uniform')
             B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
             Bstd (float, optional): standard deviation of the entries of the matrix (default is 0.05)
             p (float, optional): dropout rate (default is 0.1) 
@@ -84,8 +115,8 @@ class FCNet(nn.Module):
         """
         super(FCNet, self).__init__()
 
-        self.layers_list = [generate_layer(in_size, out_size, p) for in_size, out_size in zip(layer_sizes, layer_sizes[1:-1])]
-        self.layers_list.append(nn.Sequential(nn.Linear(layer_sizes[-2], layer_sizes[-1], bias=False), nn.Softmax(dim=1) if final_layer else nn.ReLU()))
+        self.layers_list = [generate_layer(in_size, out_size, p=p, init=init) for in_size, out_size in zip(layer_sizes, layer_sizes[1:-1])]
+        self.layers_list.append(generate_layer(layer_sizes[-2], layer_sizes[-1], p=p, final_layer=final_layer, init=init))
         
         self.layers = nn.Sequential(*self.layers_list)
         
@@ -96,7 +127,7 @@ class FCNet(nn.Module):
         for l, layer in enumerate(self.layers):
             layer.register_forward_hook(collect_activations(self, l))
             
-        self.B = generate_B(layer_sizes[0], layer_sizes[-1], B_mean_zero=B_mean_zero, Bstd=Bstd)
+        self.B = generate_B(layer_sizes[0], layer_sizes[-1], init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd)
         logger.info(f'Generated feedback matrix with shape {self.B.shape}')
         
     @torch.no_grad()
