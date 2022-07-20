@@ -1,7 +1,10 @@
 from loguru import logger
 
+from pepita.models.SkipFCNet import SkipFCNet
+
 from .FCnet import FCNet
 from .ResFCNet import ResFCNet
+from .SkipFCNet import SkipFCNet
 
 from ..dataset import get_data_info
 
@@ -34,14 +37,12 @@ def modelpool(MODELNAME, hparams):
                 p=hparams.TRAINING.DROPOUT_P
             )
         return model, input_size, n_classes, True
-    if MODELNAME.lower() == 'resfcnet':
+    if MODELNAME.lower() == 'skipfcnet':
         input_size = img_w*img_w*n_chan
-        model = ResFCNet(
+        model = SkipFCNet(
             input_size,
             n_classes,
-            hparams.MODEL.ResFCNet.BLOCK_SIZES,
-            block_depth=hparams.MODEL.ResFCNet.BLOCK_DEPTH,
-            res_connect=hparams.MODEL.ResFCNet.RES_CONNECT,
+            hparams.MODEL.SkipFCNet.BLOCK_SIZES,
             B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
             Bstd=hparams.PEPITA.BSTD,
             p=hparams.TRAINING.DROPOUT_P

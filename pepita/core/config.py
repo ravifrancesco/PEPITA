@@ -44,7 +44,7 @@ hparams.TRAINING.NORMALIZE = False
 
 # PEPITA parameters
 hparams.PEPITA = CN()
-hparams.PEPITA.B_INIT = 'c'
+hparams.PEPITA.B_INIT = 'normal'
 hparams.PEPITA.B_MEAN_ZERO = True
 hparams.PEPITA.BSTD = 0.05
 
@@ -56,11 +56,9 @@ hparams.MODEL.FCNet = CN()
 hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024] 
 hparams.MODEL.FCNet.LAYER_INIT = 'he_normal'
 
-# Parameters for ResFCNet
-hparams.MODEL.ResFCNet = CN()
-hparams.MODEL.ResFCNet.BLOCK_SIZES = [1024, 256]
-hparams.MODEL.ResFCNet.BLOCK_DEPTH = 1
-hparams.MODEL.ResFCNet.RES_CONNECT = False
+# Parameters for SkipFCNet
+hparams.MODEL.SkipFCNet = CN()
+hparams.MODEL.SkipFCNet.BLOCK_SIZES = [1024, 256]
 
 def get_hparams_defaults():
     """Get a yacs hparamsNode object with default values for my_project."""
