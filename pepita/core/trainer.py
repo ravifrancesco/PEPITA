@@ -1,8 +1,13 @@
-from audioop import avg
+import numpy as np
+
+from scipy import spatial
+
 import torch
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import StepLR
+
+
 
 import torchmetrics
 
@@ -81,7 +86,7 @@ class PEPITATrainer(pl.LightningModule):
             opt.param_groups[0]['lr'] = self.lr
 
         avg_loss = torch.stack([x['train_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'train_loss': avg_loss, 'train_acc': self.train_acc, 'step': self.current_epoch}
+        tensorboard_logs = {'train_loss': avg_loss, 'train_acc': self.train_acc, 'angle': self.compute_angle(), 'step': self.current_epoch}
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 
     def validation_step(self, batch, batch_idx):
@@ -133,3 +138,13 @@ class PEPITATrainer(pl.LightningModule):
 
     def test_dataloader(self):
         return self.test_dataloader_v
+
+    @torch.no_grad()
+    def compute_angle(self):
+        r"""Returns angle between feedforward matrix and feedback matrix
+        """
+        w = self.model.get_tot_weights().flatten()
+        b = self.model.get_B().flatten()
+        cos = 1-spatial.distance.cosine(w,b)
+        return np.arccos(cos)*180/np.pi
+

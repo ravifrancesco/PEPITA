@@ -187,4 +187,16 @@ class FCNet(nn.Module):
         self.reset_dropout_masks()
             
         return modulated_forward
+    
+    def get_B(self):
+        return self.B
+
+    @torch.no_grad()
+    def get_tot_weights(self):
+        r"""Returns the total weight matrix (input to output matrix)
+        """
+        weights = self.weights[0]
+        for w in self.weights[1:]:
+            weights = w @ weights
+        return weights.T
             
