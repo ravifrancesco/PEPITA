@@ -26,6 +26,7 @@ def create_arg_cfg(args):
     cfg.TRAINING.DECAY_EPOCH = args.decay_epoch
 
     cfg.PEPITA = CN()
+    cfg.PEPITA.B_INIT = args.b_init
     cfg.PEPITA.B_MEAN_ZERO = args.b_mean_zero
     cfg.PEPITA.BSTD = args.bstd
 
