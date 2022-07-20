@@ -18,13 +18,13 @@ class SkipFCNet(nn.Module):
             logger.error('At least one block size is expected')
             exit()
 
-        Bstd = Bstd / (len(block_sizes) + 1) # FIXME use propera formula
+        total_size = input_size + sum(block_sizes)
         
         self.blocks = [FCNet(
             [input_size] + [block_sizes[0]],
             init='he_normal', B_init='normal',
             B_mean_zero=B_mean_zero,
-            Bstd=Bstd,
+            Bstd=Bstd * input_size / total_size,
             p=p,
             final_layer=False)]
         
@@ -32,7 +32,7 @@ class SkipFCNet(nn.Module):
             [in_size, out_size], 
             init='he_normal', B_init='normal',
             B_mean_zero=B_mean_zero,
-            Bstd=Bstd,
+            Bstd=Bstd * in_size / total_size,
             p=p,
             final_layer=False) for in_size, out_size in zip(block_sizes, block_sizes[1:])])
         
@@ -40,7 +40,7 @@ class SkipFCNet(nn.Module):
             [block_sizes[-1], output_size], 
             init='he_normal', B_init='normal',
             B_mean_zero=B_mean_zero,
-            Bstd=Bstd,
+            Bstd= Bstd * block_sizes[-1] / total_size,
             p=p))
 
         self.layers_list = []
@@ -79,6 +79,4 @@ class SkipFCNet(nn.Module):
 
         l_in = x
         for b, block in enumerate(self.blocks):
-            l_in_next = block(l_in)
-            block.modulated_forward(l_in, err_l[b+1], batch_size)
-            l_in = l_in_next
+            l_in = block.modulated_forward(l_in, err_l[b+1], batch_size)

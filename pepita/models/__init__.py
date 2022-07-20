@@ -3,7 +3,6 @@ from loguru import logger
 from pepita.models.SkipFCNet import SkipFCNet
 
 from .FCnet import FCNet
-from .ResFCNet import ResFCNet
 from .SkipFCNet import SkipFCNet
 
 from ..dataset import get_data_info
