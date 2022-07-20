@@ -90,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument('-en', '--exp_name', type=str, default='exp', help="Experiment name")
     parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
     parser.add_argument('-d', '--dataset', type=str, default='cifar10', help="Dataset")
-    parser.add_argument('-s', '--seed', type=int, default=42, help="Seed value")
+    parser.add_argument('-s', '--seed', type=int, help="Seed value")
     parser.add_argument('-w', '--workers', type=int, default=4, help="Number of workers")
     parser.add_argument('-e', '--epochs', type=int, default=100, help="Number of epochs")
     parser.add_argument('-dr', '--dropout', type=float, default=0.1, help="Dropout rate")

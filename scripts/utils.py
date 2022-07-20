@@ -1,5 +1,8 @@
 from yacs.config import CfgNode as CN
 
+import random
+import sys
+
 def create_arg_cfg(args):
     r"""Returns cfg given the arguments
 
@@ -10,7 +13,7 @@ def create_arg_cfg(args):
     cfg.EXP_NAME = args.exp_name
     cfg.MODEL_ARCH = args.arch
     cfg.DATASET = args.dataset
-    cfg.SEED_VALUE = args.seed
+    cfg.SEED_VALUE = args.seed if args.seed else random.randint(0, sys.maxsize)
 
     cfg.HARDWARE = CN()
     cfg.HARDWARE.NUM_WORKERS = args.workers
