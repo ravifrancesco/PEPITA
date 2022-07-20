@@ -18,13 +18,13 @@ class SkipFCNet(nn.Module):
             logger.error('At least one block size is expected')
             exit()
 
-        total_size = input_size + sum(block_sizes)
+        Bstd = Bstd**(1 / (len(block_sizes) + 1))
         
         self.blocks = [FCNet(
             [input_size] + [block_sizes[0]],
             init='he_normal', B_init='normal',
             B_mean_zero=B_mean_zero,
-            Bstd=Bstd * input_size / total_size,
+            Bstd=Bstd,
             p=p,
             final_layer=False)]
         
@@ -32,7 +32,7 @@ class SkipFCNet(nn.Module):
             [in_size, out_size], 
             init='he_normal', B_init='normal',
             B_mean_zero=B_mean_zero,
-            Bstd=Bstd * in_size / total_size,
+            Bstd=Bstd,
             p=p,
             final_layer=False) for in_size, out_size in zip(block_sizes, block_sizes[1:])])
         
@@ -40,7 +40,7 @@ class SkipFCNet(nn.Module):
             [block_sizes[-1], output_size], 
             init='he_normal', B_init='normal',
             B_mean_zero=B_mean_zero,
-            Bstd= Bstd * block_sizes[-1] / total_size,
+            Bstd= Bstd,
             p=p))
 
         self.layers_list = []
@@ -65,9 +65,11 @@ class SkipFCNet(nn.Module):
             res += block.__repr__() + '\n'
         return res
     
+    @torch.no_grad()
     def forward(self, x):
         return self.layers(x)
     
+    @torch.no_grad()
     def modulated_forward(self, x, e, batch_size):
 
         err_l = []
@@ -80,3 +82,20 @@ class SkipFCNet(nn.Module):
         l_in = x
         for b, block in enumerate(self.blocks):
             l_in = block.modulated_forward(l_in, err_l[b+1], batch_size)
+
+    @torch.no_grad()
+    def get_B(self):
+        r"""Returns the total feedback matrix"""
+        b = self.blocks[0].get_B()
+        for block in self.blocks[1:]:
+            b = b @ block.get_B()
+        return b
+
+    @torch.no_grad()
+    def get_tot_weights(self):
+        r"""Returns the total weight matrix (input to output matrix)
+        """
+        weights = self.weights[0]
+        for w in self.weights[1:]:
+            weights = w @ weights
+        return weights.T
