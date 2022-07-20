@@ -1,6 +1,7 @@
 from loguru import logger
 
 from .FCnet import FCNet
+from .ResFCNet import ResFCNet
 
 from ..dataset import get_data_info
 
@@ -30,6 +31,19 @@ def modelpool(MODELNAME, hparams):
                 Bstd=hparams.PEPITA.BSTD,
                 p=hparams.TRAINING.DROPOUT_P
             )
+        return model, input_size, n_classes, True
+    if MODELNAME.lower() == 'resfcnet':
+        input_size = img_w*img_w*n_chan
+        model = ResFCNet(
+            input_size,
+            n_classes,
+            hparams.MODEL.ResFCNet.BLOCK_SIZES,
+            block_depth=hparams.MODEL.ResFCNet.BLOCK_DEPTH,
+            res_connect=hparams.MODEL.ResFCNet.RES_CONNECT,
+            B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
+            Bstd=hparams.PEPITA.BSTD,
+            p=hparams.TRAINING.DROPOUT_P
+        )
         return model, input_size, n_classes, True
     else:
         logger.error(f'Model \'{MODELNAME.lower()}\' is not implemented yet')

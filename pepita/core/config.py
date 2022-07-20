@@ -53,6 +53,12 @@ hparams.MODEL = CN()
 hparams.MODEL.FCNet = CN()
 hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024] 
 
+# Parameters for ResFCNet
+hparams.MODEL.ResFCNet = CN()
+hparams.MODEL.ResFCNet.BLOCK_SIZES = [1024, 256]
+hparams.MODEL.ResFCNet.BLOCK_DEPTH = 1
+hparams.MODEL.ResFCNet.RES_CONNECT = False
+
 def get_hparams_defaults():
     """Get a yacs hparamsNode object with default values for my_project."""
     return hparams.clone()
