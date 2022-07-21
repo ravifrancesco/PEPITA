@@ -86,7 +86,13 @@ class PEPITATrainer(pl.LightningModule):
             opt.param_groups[0]['lr'] = self.lr
 
         avg_loss = torch.stack([x['train_loss'] for x in outputs]).mean()
-        tensorboard_logs = {'train_loss': avg_loss, 'train_acc': self.train_acc, 'angle': self.compute_angle(), 'step': self.current_epoch}
+        tensorboard_logs = {
+            'train_loss': avg_loss,
+            'train_acc': self.train_acc,
+            'angle': self.compute_angle(),
+            'step': self.current_epoch,
+            'weight_norms': self.model.get_weights_norm()
+        }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 
     def validation_step(self, batch, batch_idx):

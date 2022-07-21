@@ -99,3 +99,12 @@ class SkipFCNet(nn.Module):
         for w in self.weights[1:]:
             weights = w @ weights
         return weights.T
+
+    @torch.no_grad()
+    def get_weights_norm(self):
+        r"""Returns dict with norms of weight matrixes
+        """
+        d = {}
+        for i, w in enumerate(self.weights):
+            d[f'layer{i}'] = torch.linalg.norm(w)
+        return d
