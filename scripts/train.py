@@ -104,7 +104,7 @@ if __name__ == '__main__':
     parser.add_argument('-bm', '--b_mean_zero', action='store_false', help="Mean of B is 0")
     parser.add_argument('-bstd', '--bstd', type=float, default=0.05, help="B standar deviation")
     parser.add_argument('-n', '--normalize', action='store_true', help='normalize data')
-
+    parser.add_argument('-bd', '--b_decay', type=float, default=1., help='normalize data')
 
     args = parser.parse_args()
 
