@@ -65,7 +65,7 @@ class PEPITATrainer(pl.LightningModule):
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
             # Compute modulated activations
-            self.model.modulated_forward(imgs, outputs-one_hot, self.bs)
+            self.model.modulated_forward(imgs, outputs-one_hot, imgs.shape[0])
 
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
