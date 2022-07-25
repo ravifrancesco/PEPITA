@@ -151,10 +151,7 @@ class PEPITATrainer(pl.LightningModule):
 
     @torch.no_grad()
     def compute_angle(self):
-        r"""Returns angle between feedforward matrix and feedback matrix
+        r"""Returns angle between feedforward matrix and feedback matrix TODO adapt other functions to support multiple angles
         """
-        w = self.model.get_tot_weights().flatten()
-        b = self.model.get_B().flatten()
-        cos = 1-spatial.distance.cosine(w,b)
-        return np.arccos(cos)*180/np.pi
+        return self.model.compute_angle()
 

@@ -5,6 +5,8 @@ from loguru import logger
 import torch
 import torch.nn as nn
 
+from scipy import spatial
+
 from pepita.models.layers.ConsistentDropout import ConsistentDropout
 
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
@@ -96,7 +98,7 @@ class FCNetMirror(nn.Module):
         B (torch.Tensor): feedback matrix
     """
     @torch.no_grad()
-    def __init__(self, layer_sizes, init='he_normal', B_init='normal', B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True, wmlr=0.01, wmwd=0.5):
+    def __init__(self, layer_sizes, init='he_normal', B_init='normal', B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True, wmlr=0.1, wmwd=0.5):
         r"""
         Args:
             layer_sizes (list[int]): sizes of each layers
@@ -198,7 +200,7 @@ class FCNetMirror(nn.Module):
             noise_y = layer(noise_x)
             # update the backward weight matrices using the equation 7 of the paper manuscript
             update = noise_x.T @ noise_y / batch_size
-            self.Bs[l] = (1-self.wmwd) * self.Bs[l] - self.wmlr * update
+            self.Bs[l] = (1-self.wmwd) * self.Bs[l] + self.wmlr * update
         # Dropout masks reset
         
         self.reset_dropout_masks()
@@ -225,5 +227,16 @@ class FCNetMirror(nn.Module):
         for i, w in enumerate(self.weights):
             d[f'layer{i}'] = torch.linalg.norm(w)
         return d
+
+    @torch.no_grad()
+    def compute_angle(self):
+        r"""Returns angle between feedforward matrix and feedback matrix TODO adapt other functions to support multiple angles
+        """
+        cos0 = 1-spatial.distance.cosine(self.weights[0].flatten(), self.Bs[0].flatten())
+        ang0 = np.arccos(cos0)*180/np.pi
+        cos1 = 1-spatial.distance.cosine(self.weights[1].flatten(), self.Bs[1].flatten())
+        ang1 = np.arccos(cos1)*180/np.pi
+
+        return {'w0': ang0, 'w1': ang1}
 
             
