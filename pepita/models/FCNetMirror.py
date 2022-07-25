@@ -232,9 +232,9 @@ class FCNetMirror(nn.Module):
     def compute_angle(self):
         r"""Returns angle between feedforward matrix and feedback matrix TODO adapt other functions to support multiple angles
         """
-        cos0 = 1-spatial.distance.cosine(self.weights[0].flatten(), self.Bs[0].flatten())
+        cos0 = 1-spatial.distance.cosine(self.weights[0].flatten().T, self.Bs[0].flatten())
         ang0 = np.arccos(cos0)*180/np.pi
-        cos1 = 1-spatial.distance.cosine(self.weights[1].flatten(), self.Bs[1].flatten())
+        cos1 = 1-spatial.distance.cosine(self.weights[1].flatten().T, self.Bs[1].flatten())
         ang1 = np.arccos(cos1)*180/np.pi
 
         return {'w0': ang0, 'w1': ang1}
