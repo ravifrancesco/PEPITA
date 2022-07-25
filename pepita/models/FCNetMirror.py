@@ -96,7 +96,7 @@ class FCNetMirror(nn.Module):
         B (torch.Tensor): feedback matrix
     """
     @torch.no_grad()
-    def __init__(self, layer_sizes, init='he_normal', B_init='normal', B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True):
+    def __init__(self, layer_sizes, init='he_normal', B_init='normal', B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True, wmlr=0.01, wmwd=0.5):
         r"""
         Args:
             layer_sizes (list[int]): sizes of each layers
@@ -125,12 +125,16 @@ class FCNetMirror(nn.Module):
         sd = np.sqrt(2.0 / layer_sizes[0]) * Bstd
         logger.info(f'Expected STD = {torch.std(torch.empty(layer_sizes[0], layer_sizes[-1]).normal_(mean=0,std=np.sqrt(2.0 / layer_sizes[0])) * Bstd)}')
             
-        self.B2 = generate_B(layer_sizes[1], layer_sizes[-1], (sd / (layer_sizes[1]**(1./2.)))**(1./2.))
-        self.B1 = generate_B(layer_sizes[0], layer_sizes[1], (sd / (layer_sizes[1]**(1./2.)))**(1./2.))
-        logger.info(f'Generated feedback matrix 2 with shape {self.B2.shape}')
-        logger.info(f'Generated feedback matrix 1 with shape {self.B1.shape}')
-        logger.info(f'Obtained STD = {torch.std(self.B1 @ self.B2)}')
-        logger.info(f'Obtained Mean = {torch.mean(self.B1 @ self.B2)}')
+        self.Bs = []
+        self.Bs.append(generate_B(layer_sizes[0], layer_sizes[1], (sd / (layer_sizes[1]**(1./2.)))**(1./2.)))
+        self.Bs.append(generate_B(layer_sizes[1], layer_sizes[-1], (sd / (layer_sizes[1]**(1./2.)))**(1./2.)))
+        logger.info(f'Generated feedback matrix 1 with shape {self.Bs[0].shape}')
+        logger.info(f'Generated feedback matrix 2 with shape {self.Bs[1].shape}')
+        logger.info(f'Obtained STD = {torch.std(self.Bs[0] @ self.Bs[1])}')
+        logger.info(f'Obtained Mean = {torch.mean(self.Bs[0] @ self.Bs[1])}')
+
+        self.wmlr = wmlr
+        self.wmwd = wmwd
         
     @torch.no_grad()
     def get_activations(self):
@@ -161,7 +165,7 @@ class FCNetMirror(nn.Module):
         return self.layers(x)
 
     @torch.no_grad()
-    def modulated_forward(self, x, e, batch_size):
+    def modulated_forward(self, x, e, batch_size, noise_amplitude=0.1):
         r"""Updates the layers gradient according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
 
         Args:
@@ -172,8 +176,8 @@ class FCNetMirror(nn.Module):
         Returns:
             modulated_forward (torch.Tensor): modulated output
         """
-
-        B = self.B1 @ self.B2
+        # Engaged mode
+        B = self.Bs[0] @ self.Bs[1]
         
         hl_err = x + (e @ B.T)
 
@@ -188,12 +192,21 @@ class FCNetMirror(nn.Module):
                 dwl = (forward_activations[l] - modulated_activations[l]).T @ (modulated_activations[l - 1] if l != 0 else hl_err)
             layer[0].weight.grad = dwl / batch_size
         
+        # Mirror mode
+        for l, layer in enumerate(self.layers):
+            noise_x = noise_amplitude * (torch.randn(batch_size, self.weights[l].shape[1]) - 0.5)
+            noise_y = layer(noise_x)
+            # update the backward weight matrices using the equation 7 of the paper manuscript
+            update = noise_x.T @ noise_y / batch_size
+            self.Bs[l] = (1-self.wmwd) * self.Bs[l] - self.wmlr * update
+        # Dropout masks reset
+        
         self.reset_dropout_masks()
             
         return modulated_forward
     
     def get_B(self):
-        return self.B1 @ self.B2
+        return self.Bs[0] @ self.Bs[1]
 
     @torch.no_grad()
     def get_tot_weights(self):
