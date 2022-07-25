@@ -49,7 +49,7 @@ def generate_layer(in_size, out_size, p=0.1, final_layer=False, init='he_uniform
         return nn.Sequential(w, a)
     else:
         d = ConsistentDropout(p=p)
-        a = nn.ReLu()
+        a = nn.ReLU()
         return nn.Sequential(w, d, a)
 
 @torch.no_grad()
@@ -95,7 +95,7 @@ def generate_B(n_in, n_out, init='uniform', B_mean_zero=True, Bstd=0.05):
     return B
 
 # FIXME integrate in proper module
-class TestNet(nn.Module):
+class TestNet2(nn.Module):
     r"""Fully connected network 
 
     Attributes:
@@ -114,7 +114,7 @@ class TestNet(nn.Module):
             p (float, optional): dropout rate (default is 0.1) 
             final_layer (bool, optional): if True, the last layer is treated as the last layer of the network (default is True)
         """
-        super(TestNet, self).__init__()
+        super(TestNet2, self).__init__()
 
         self.layers_list = [generate_layer(in_size, out_size, p=p, init=init) for in_size, out_size in zip(layer_sizes, layer_sizes[1:-1])]
         self.layers_list.append(generate_layer(layer_sizes[-2], layer_sizes[-1], p=p, final_layer=final_layer, init=init))
@@ -130,11 +130,11 @@ class TestNet(nn.Module):
             
         self.B0 = generate_B(layer_sizes[0], layer_sizes[-1], init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd)
         self.B1 = generate_B(layer_sizes[2], layer_sizes[-1], init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd*b_decay)
-        # self.F = generate_B(layer_sizes[2], layer_sizes[0], init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd*0.01)
+        self.B2 = generate_B(layer_sizes[4], layer_sizes[-1], init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd*b_decay)
 
         logger.info(f'Generated feedback matrix 0 with shape {self.B0.shape}')
         logger.info(f'Generated feedback matrix 1 with shape {self.B1.shape}')
-        # logger.info(f'Generated skip matrix with shape {self.F.shape}')
+        logger.info(f'Generated feedback matrix 2 with shape {self.B2.shape}')
         
     @torch.no_grad()
     def get_activations(self):
@@ -192,11 +192,24 @@ class TestNet(nn.Module):
             layer[0].weight.grad = dwl / batch_size
 
         hl_err = forward_activations[1] + (e @ self.B1.T)
-        # hl_err = x @ self.F.T + (e @ self.B1.T)
         # print(hl_err.shape)
         modulated_forward = self.forward(hl_err, start=2)
         modulated_activations = self.get_activations()
         for l, layer in enumerate(self.layers[2:], 2):
+            # print(l)
+            if (l == len(self.layers) - 1):
+                dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
+            else:
+                dwl = (forward_activations[l] - modulated_activations[l]).T @ (modulated_activations[l - 1] if l != 0 else hl_err)
+            # print(dwl.shape)
+            # print(layer[0].weight.shape)
+            layer[0].weight.grad = dwl / batch_size
+
+        hl_err = forward_activations[3] + (e @ self.B2.T)
+        # print(hl_err.shape)
+        modulated_forward = self.forward(hl_err, start=4)
+        modulated_activations = self.get_activations()
+        for l, layer in enumerate(self.layers[4:], 4):
             # print(l)
             if (l == len(self.layers) - 1):
                 dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)

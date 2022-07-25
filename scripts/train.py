@@ -99,7 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('-bs', '--batch_size', type=int, default=64, help="Batch size")
     parser.add_argument('-au', '--augment', action='store_true', help='Data augmentation')
     parser.add_argument('-lrd', '--decay', type=float, default=0.1, help="Learning rate decay")
-    parser.add_argument('-de', '--decay_epoch', nargs='*', help='Learning rate decay epochs', default=[60,90])
+    parser.add_argument('-de', '--decay_epoch', type=int, nargs='*', help='Learning rate decay epochs', default=[60,90])
     parser.add_argument('-bi', '--b_init', type=str, help="B init mode", default='uniform')
     parser.add_argument('-bm', '--b_mean_zero', action='store_false', help="Mean of B is 0")
     parser.add_argument('-bstd', '--bstd', type=float, default=0.05, help="B standar deviation")

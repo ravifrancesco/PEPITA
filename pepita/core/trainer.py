@@ -133,13 +133,12 @@ class PEPITATrainer(pl.LightningModule):
 
     def configure_optimizers(self):
         # TODO make changeable
-        par_list = []
-        lr = self.lr
-        for n, p in self.named_parameters():
-            par_list.append({"params": p, "lr": lr})
-            lr = 0.5 * lr
-        return torch.optim.SGD(par_list, lr=self.lr, momentum=0.9)
-
+        # par_list = []
+        # lr = self.lr
+        # for n, p in self.named_parameters():
+        #     par_list.append({"params": p, "lr": lr})
+        #     lr = 0.5 * lr
+        return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.0001)
     def train_dataloader(self):
         return self.train_dataloader_v
     
