@@ -1,9 +1,6 @@
 from loguru import logger
 
-from pepita.models.SkipFCNet import SkipFCNet
-
 from .FCnet import FCNet
-from .SkipFCNet import SkipFCNet
 
 from ..dataset import get_data_info
 
@@ -35,17 +32,6 @@ def modelpool(MODELNAME, hparams):
                 Bstd=hparams.PEPITA.BSTD,
                 p=hparams.TRAINING.DROPOUT_P
             )
-        return model, input_size, n_classes, True
-    if MODELNAME.lower() == 'skipfcnet':
-        input_size = img_w*img_w*n_chan
-        model = SkipFCNet(
-            input_size,
-            n_classes,
-            hparams.MODEL.SkipFCNet.BLOCK_SIZES,
-            B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
-            Bstd=hparams.PEPITA.BSTD,
-            p=hparams.TRAINING.DROPOUT_P
-        )
         return model, input_size, n_classes, True
     else:
         logger.error(f'Model \'{MODELNAME.lower()}\' is not implemented yet')
