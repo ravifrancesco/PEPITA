@@ -52,6 +52,9 @@ class PEPITATrainer(pl.LightningModule):
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
 
+        self.wmlr = 0.01
+        self.wmwd = 0.0001
+
     def forward(self, x):
         return self.model(x)
 
@@ -65,14 +68,20 @@ class PEPITATrainer(pl.LightningModule):
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
             # Compute modulated activations
-            self.model.modulated_forward(imgs, outputs-one_hot, imgs.shape[0])
+            if self.current_epoch >= 5:
+                self.model.modulated_forward(imgs, outputs-one_hot, imgs.shape[0])
+                if self.current_epoch%10==0 and self.current_epoch >= 60:
+                    self.model.mirror_weights(imgs.shape[0])
+            else:
+                self.model.mirror_weights(imgs.shape[0])
 
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
             
-            opt = self.optimizers()
-            opt.step()
-            opt.zero_grad()
+            if self.current_epoch >= 5:
+                opt = self.optimizers()
+                opt.step()
+                opt.zero_grad()
 
         return {'train_loss': loss, 'train_acc': self.train_acc}
 
@@ -86,6 +95,7 @@ class PEPITATrainer(pl.LightningModule):
             opt.param_groups[0]['lr'] = self.lr
 
         avg_loss = torch.stack([x['train_loss'] for x in outputs]).mean()
+
         tensorboard_logs = {
             'train_loss': avg_loss,
             'train_acc': self.train_acc,
@@ -138,7 +148,7 @@ class PEPITATrainer(pl.LightningModule):
         # for n, p in self.named_parameters():
         #     par_list.append({"params": p, "lr": lr})
         #     lr = 0.5 * lr
-        return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0.0001)
+        return torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=0)
     def train_dataloader(self):
         return self.train_dataloader_v
     

@@ -4,6 +4,7 @@ from loguru import logger
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from scipy import spatial
 
@@ -98,7 +99,7 @@ class FCNetMirror(nn.Module):
         B (torch.Tensor): feedback matrix
     """
     @torch.no_grad()
-    def __init__(self, layer_sizes, init='he_normal', B_init='normal', B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True, wmlr=0.1, wmwd=0.5):
+    def __init__(self, layer_sizes, init='he_normal', B_init='normal', B_mean_zero=True, Bstd=0.05, p=0.1, final_layer=True):
         r"""
         Args:
             layer_sizes (list[int]): sizes of each layers
@@ -123,7 +124,6 @@ class FCNetMirror(nn.Module):
         for l, layer in enumerate(self.layers):
             layer.register_forward_hook(collect_activations(self, l))
 
-
         sd = np.sqrt(2.0 / layer_sizes[0]) * Bstd
         logger.info(f'Expected STD = {torch.std(torch.empty(layer_sizes[0], layer_sizes[-1]).normal_(mean=0,std=np.sqrt(2.0 / layer_sizes[0])) * Bstd)}')
             
@@ -135,8 +135,6 @@ class FCNetMirror(nn.Module):
         logger.info(f'Obtained STD = {torch.std(self.Bs[0] @ self.Bs[1])}')
         logger.info(f'Obtained Mean = {torch.mean(self.Bs[0] @ self.Bs[1])}')
 
-        self.wmlr = wmlr
-        self.wmwd = wmwd
         
     @torch.no_grad()
     def get_activations(self):
@@ -167,7 +165,7 @@ class FCNetMirror(nn.Module):
         return self.layers(x)
 
     @torch.no_grad()
-    def modulated_forward(self, x, e, batch_size, noise_amplitude=0.1):
+    def modulated_forward(self, x, e, batch_size):
         r"""Updates the layers gradient according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
 
         Args:
@@ -193,22 +191,34 @@ class FCNetMirror(nn.Module):
             else:
                 dwl = (forward_activations[l] - modulated_activations[l]).T @ (modulated_activations[l - 1] if l != 0 else hl_err)
             layer[0].weight.grad = dwl / batch_size
-        
-        # Mirror mode
-        for l, layer in enumerate(self.layers):
-            noise_x = noise_amplitude * (torch.randn(batch_size, self.weights[l].shape[1]) - 0.5)
-            noise_y = layer(noise_x)
-            # update the backward weight matrices using the equation 7 of the paper manuscript
-            update = noise_x.T @ noise_y / batch_size
-            self.Bs[l] = (1-self.wmwd) * self.Bs[l] + self.wmlr * update
-        # Dropout masks reset
-        
+
         self.reset_dropout_masks()
             
         return modulated_forward
+
+    @torch.no_grad()
+    def mirror_weights(self, batch_size, noise_amplitude=0.1, wmlr=0.01, wmwd=0.0001):
+
+        # TODO print per epoch
+
+        for l, layer in enumerate(self.layers):
+            noise_x = noise_amplitude * (torch.randn(batch_size, self.weights[l].shape[1]))
+            noise_x -= torch.mean(noise_x).item()
+            noise_y = layer(noise_x)
+            # update the backward weight matrices using the equation 7 of the paper manuscript
+            update = noise_x.T @ noise_y / batch_size
+            if l%2==0:
+                self.Bs[l] = (1-wmwd) * self.Bs[l] - wmlr * update
+            else:
+                self.Bs[l] = (1-wmwd) * self.Bs[l] + wmlr * update
+        
+        self.reset_dropout_masks()
     
     def get_B(self):
         return self.Bs[0] @ self.Bs[1]
+    
+    def get_B_norm(self):
+        return {'b0' : torch.linalg.norm(self.Bs[0]), 'b1': torch.linalg.norm(self.Bs[1])}
 
     @torch.no_grad()
     def get_tot_weights(self):
@@ -232,11 +242,13 @@ class FCNetMirror(nn.Module):
     def compute_angle(self):
         r"""Returns angle between feedforward matrix and feedback matrix TODO adapt other functions to support multiple angles
         """
-        cos0 = 1-spatial.distance.cosine(self.weights[0].flatten().T, self.Bs[0].flatten())
+        cos0 = 1-spatial.distance.cosine(self.weights[0].T.flatten(), self.Bs[0].flatten())
         ang0 = np.arccos(cos0)*180/np.pi
-        cos1 = 1-spatial.distance.cosine(self.weights[1].flatten().T, self.Bs[1].flatten())
+        cos1 = 1-spatial.distance.cosine(self.weights[1].T.flatten(), self.Bs[1].flatten())
         ang1 = np.arccos(cos1)*180/np.pi
+        cost = 1-spatial.distance.cosine(self.get_tot_weights().flatten(), self.get_B().flatten())
+        angt = np.arccos(cost)*180/np.pi
 
-        return {'w0': ang0, 'w1': ang1}
+        return {'w0': ang0, 'w1': ang1, 'wt': angt}
 
             

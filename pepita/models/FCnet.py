@@ -5,6 +5,8 @@ from loguru import logger
 import torch
 import torch.nn as nn
 
+from scipy import spatial
+
 from pepita.models.layers.ConsistentDropout import ConsistentDropout
 
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
@@ -208,5 +210,14 @@ class FCNet(nn.Module):
         for i, w in enumerate(self.weights):
             d[f'layer{i}'] = torch.linalg.norm(w)
         return d
+
+    @torch.no_grad()
+    def compute_angle(self):
+        r"""Returns angle between feedforward matrix and feedback matrix TODO adapt other functions to support multiple angles
+        """
+        cost = 1-spatial.distance.cosine(self.get_tot_weights().flatten(), self.get_B().flatten())
+        angt = np.arccos(cost)*180/np.pi
+
+        return {'wt': angt}
 
             
