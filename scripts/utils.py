@@ -23,10 +23,16 @@ def create_arg_cfg(args):
     cfg.TRAINING.DROPOUT_P = args.dropout
     cfg.TRAINING.VAL_SPLIT = args.val_split
     cfg.TRAINING.LR = args.learning_rate
+    cfg.TRAINING.WD = args.weight_decay
+    cfg.TRAINING.MOMENTUM = args.momentum
     cfg.TRAINING.BATCH_SIZE = args.batch_size
     cfg.TRAINING.AUGMENT = args.augment
     cfg.TRAINING.LR_DECAY = args.decay
     cfg.TRAINING.DECAY_EPOCH = args.decay_epoch
+    cfg.TRAINING.WMLR = args.wm_learning_rate
+    cfg.TRAINING.WMWD = args.wm_weight_decay
+    cfg.TRAINING.PRE_MIRROR = args.pre_mirror
+    cfg.TRAINING.MIRROR = args.mirror
 
     cfg.PEPITA = CN()
     cfg.PEPITA.B_INIT = args.b_init
