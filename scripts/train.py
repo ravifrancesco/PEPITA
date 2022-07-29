@@ -109,7 +109,7 @@ if __name__ == '__main__':
     parser.add_argument('-wmlr', '--wm_learning_rate', type=float, default=0.01, help='Weight mirroring learning rate')
     parser.add_argument('-wmwd', '--wm_weight_decay', type=float, default=0.0001, help='Weight mirroring weight decay')
     parser.add_argument('-prm', '--pre_mirror', type=int, default=0, help="Number of epochs of pre mirroring")
-    parser.add_argument('-mir', '--mirror', type=int, default=100, help="How often to perform weight mirroring")
+    parser.add_argument('-mir', '--mirror', type=int, default=200, help="How often to perform weight mirroring")
 
     args = parser.parse_args()
 
