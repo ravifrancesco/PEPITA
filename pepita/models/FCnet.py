@@ -264,7 +264,7 @@ class FCNet(nn.Module):
             noise_y = layer(noise_x)
             # update the backward weight matrices using the equation 7 of the paper manuscript
             update = noise_x.T @ noise_y / batch_size
-            if l % 2 == 0:
+            if l == 0:
                 self.Bs[l].grad = update
             else:
                 self.Bs[l].grad = -update
