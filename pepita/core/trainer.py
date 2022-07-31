@@ -65,6 +65,9 @@ class PEPITATrainer(pl.LightningModule):
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
 
+        self.wmlr = 0.01
+        self.wmwd = 0.0001
+
     def forward(self, x):
         return self.model(x)
 
@@ -90,6 +93,11 @@ class PEPITATrainer(pl.LightningModule):
 
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
+            
+            if self.current_epoch >= 5:
+                opt = self.optimizers()
+                opt.step()
+                opt.zero_grad()
 
             opt_w, opt_b = self.optimizers()
             opt_w.step()
@@ -165,6 +173,7 @@ class PEPITATrainer(pl.LightningModule):
         logger.info(f"Testing acc: {test_acc}")
 
     def configure_optimizers(self):
+
         # optimizer for weights
         opt_w = torch.optim.SGD(
             self.parameters(), lr=self.lr, momentum=self.mom, weight_decay=self.wd
@@ -182,3 +191,10 @@ class PEPITATrainer(pl.LightningModule):
 
     def test_dataloader(self):
         return self.test_dataloader_v
+
+    @torch.no_grad()
+    def compute_angle(self):
+        r"""Returns angle between feedforward matrix and feedback matrix TODO adapt other functions to support multiple angles
+        """
+        return self.model.compute_angle()
+

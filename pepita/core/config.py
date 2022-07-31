@@ -60,6 +60,16 @@ hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024, 512, 216]
 hparams.MODEL.FCNet.LAYER_INIT = "he_normal"
 
 
+
+# Parameters for SkipFCNet
+hparams.MODEL.TestNet = CN()
+hparams.MODEL.TestNet.B_DECAY = 1.
+
+# Parameters for WM
+hparams.MODEL.WM = CN()
+hparams.MODEL.WM.WMLR = 0.01
+hparams.MODEL.WM.WD = 0.5
+
 def get_hparams_defaults():
     """Get a yacs hparamsNode object with default values for my_project."""
     return hparams.clone()
