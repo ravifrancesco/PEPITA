@@ -1,8 +1,7 @@
 from loguru import logger
 
-from pepita.models.SkipFCNet import SkipFCNet
-
 from .FCnet import FCNet
+
 from .SkipFCNet import SkipFCNet
 from .TestNet import TestNet
 from .TestNet2 import TestNet2
@@ -32,58 +31,6 @@ def modelpool(MODELNAME, hparams):
         hidden_layers = hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES
         layers = [input_size] + hidden_layers + [n_classes]
         model = FCNet(
-                layers,
-                init=hparams.MODEL.FCNet.LAYER_INIT,
-                B_init=hparams.PEPITA.B_INIT,
-                B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
-                Bstd=hparams.PEPITA.BSTD,
-                p=hparams.TRAINING.DROPOUT_P
-            )
-        return model, input_size, n_classes, True
-    if MODELNAME.lower() == 'skipfcnet':
-        input_size = img_w*img_w*n_chan
-        model = SkipFCNet(
-            input_size,
-            n_classes,
-            hparams.MODEL.SkipFCNet.BLOCK_SIZES,
-            B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
-            Bstd=hparams.PEPITA.BSTD,
-            p=hparams.TRAINING.DROPOUT_P
-        )
-        return model, input_size, n_classes, True
-    if MODELNAME.lower() == 'testnet':
-        input_size = img_w*img_w*n_chan
-        hidden_layers = hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES
-        layers = [input_size] + hidden_layers + [n_classes]
-        model = TestNet(
-                layers,
-                init=hparams.MODEL.FCNet.LAYER_INIT,
-                B_init=hparams.PEPITA.B_INIT,
-                B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
-                Bstd=hparams.PEPITA.BSTD,
-                p=hparams.TRAINING.DROPOUT_P,
-                b_decay=hparams.MODEL.TestNet.B_DECAY
-            )
-        return model, input_size, n_classes, True
-    if MODELNAME.lower() == 'testnet2':
-        input_size = img_w*img_w*n_chan
-        hidden_layers = hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES
-        layers = [input_size] + hidden_layers + [n_classes]
-        model = TestNet2(
-                layers,
-                init=hparams.MODEL.FCNet.LAYER_INIT,
-                B_init=hparams.PEPITA.B_INIT,
-                B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
-                Bstd=hparams.PEPITA.BSTD,
-                p=hparams.TRAINING.DROPOUT_P,
-                b_decay=hparams.MODEL.TestNet.B_DECAY
-            )
-        return model, input_size, n_classes, True
-    if MODELNAME.lower() == 'fcnetmirror':
-        input_size = img_w*img_w*n_chan
-        hidden_layers = hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES
-        layers = [input_size] + hidden_layers + [n_classes]
-        model = FCNetMirror(
                 layers,
                 init=hparams.MODEL.FCNet.LAYER_INIT,
                 B_init=hparams.PEPITA.B_INIT,
