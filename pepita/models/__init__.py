@@ -2,12 +2,6 @@ from loguru import logger
 
 from .FCnet import FCNet
 
-from .SkipFCNet import SkipFCNet
-from .TestNet import TestNet
-from .TestNet2 import TestNet2
-from .FCNetMirror import FCNetMirror
-
-
 from ..dataset import get_data_info
 
 def modelpool(MODELNAME, hparams):

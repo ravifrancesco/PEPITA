@@ -39,8 +39,4 @@ def create_arg_cfg(args):
     cfg.PEPITA.B_MEAN_ZERO = args.b_mean_zero
     cfg.PEPITA.BSTD = args.bstd
 
-    cfg.MODEL = CN()
-    cfg.MODEL.TestNet = CN()
-    cfg.MODEL.TestNet.B_DECAY = args.b_decay
-
     return cfg

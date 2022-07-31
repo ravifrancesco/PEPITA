@@ -68,6 +68,9 @@ class PEPITATrainer(pl.LightningModule):
         self.wmlr = 0.01
         self.wmwd = 0.0001
 
+        #TEST
+        self.save = hparams.MODEL_DIR
+
     def forward(self, x):
         return self.model(x)
 
@@ -126,6 +129,9 @@ class PEPITATrainer(pl.LightningModule):
             "step": self.current_epoch,
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
+
+        if self.current_epoch == 46:
+            self.save_checkpoint(f'{self.save}/model_46.ckpt')
 
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
