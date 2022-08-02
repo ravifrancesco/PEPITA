@@ -128,6 +128,7 @@ class FCNet(nn.Module):
     def __init__(
         self,
         layer_sizes,
+        block_size=0,
         init="he_uniform",
         B_init="uniform",
         B_mean_zero=True,
@@ -138,6 +139,7 @@ class FCNet(nn.Module):
         r"""
         Args:
             layer_sizes (list[int]): sizes of each layers
+            block_size (int, optional): size of block. If 0 then the whole network is considered as one block (default is 0)
             init (str, optional): layer initialization mode (default is 'he_uniform')
             B_init (str, optional): B initialization mode (default is 'uniform')
             B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
@@ -163,6 +165,12 @@ class FCNet(nn.Module):
         )
 
         self.layers = nn.Sequential(*self.layers_list)
+
+        if B_init=='uniform' and block_size > 0:
+            logger.error(f'Block size {block_size} requires normal B initialization')
+            exit()
+
+        self.block_size = block_size if block_size > 0 else len(self.layers_list)
 
         self.weights = [layer[0].weight for layer in self.layers]
 
@@ -197,17 +205,17 @@ class FCNet(nn.Module):
             if module.__class__ is ConsistentDropout:
                 module.reset_mask()
 
-    @torch.no_grad()
-    def forward(self, x):
+    @torch.no_grad()      
+    def forward(self, x, start=0):
         r"""Computes the forward pass and returns the output
-
+        
         Args:
             x (torch.Tensor): the input
-
+            start (int, optiona): from which layer to compute the forward pass (defaul is 0)
         Returns:
             output (torch.Tensor): the network output
         """
-        return self.layers(x)
+        return self.layers[start:](x)
 
     @torch.no_grad()
     def modulated_forward(self, x, e, batch_size):
@@ -217,18 +225,18 @@ class FCNet(nn.Module):
             x (torch.Tensor): the network input
             e (torch.Tensor): the error computed at the output after the first forward pass
             batch_size (int): the batch size
-
-        Returns:
-            modulated_forward (torch.Tensor): modulated output
         """
 
-        hl_err = x + (e @ self.get_B().T)
-
+        input = x
         forward_activations = self.get_activations()
-        modulated_forward = self.forward(hl_err)
-        modulated_activations = self.get_activations()
 
         for l, layer in enumerate(self.layers):
+
+            if not l % self.block_size and l != len(self.layers) - 1:
+                hl_err = input + (e @ self.get_B(l).T)
+                modulated_forward = self.forward(hl_err, start=l)
+                modulated_activations = self.get_activations()
+
             if l == len(self.layers) - 1:
                 dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
             else:
@@ -236,10 +244,9 @@ class FCNet(nn.Module):
                     modulated_activations[l - 1] if l != 0 else hl_err
                 )
             layer[0].weight.grad = dwl / batch_size
+            input = forward_activations[l]
 
         self.reset_dropout_masks()
-
-        return modulated_forward
 
     @torch.no_grad()
     def mirror_weights(self, batch_size, noise_amplitude=0.1):
@@ -272,10 +279,17 @@ class FCNet(nn.Module):
         self.reset_dropout_masks()
 
     @torch.no_grad()
-    def get_B(self):
-        r"""Returns B (from output to input)"""
-        B = self.Bs[0]
-        for b in self.Bs[1:]:
+    def get_B(self, layer=0):
+        r"""Returns be to given layer
+
+        Args:
+            layer (int, optional): layer onto which project the error (defaul is 0)
+
+        Returns:
+            B_l (torch.Tensor): feedback matrix for error projection to given layer
+        """
+        B = self.Bs[layer]
+        for b in self.Bs[layer + 1:]:
             B = B @ b
         return B
 

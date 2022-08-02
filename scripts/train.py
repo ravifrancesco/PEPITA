@@ -110,6 +110,8 @@ if __name__ == '__main__':
     parser.add_argument('-wmwd', '--wm_weight_decay', type=float, default=0.0001, help='Weight mirroring weight decay')
     parser.add_argument('-prm', '--pre_mirror', type=int, default=0, help="Number of epochs of pre mirroring")
     parser.add_argument('-mir', '--mirror', type=int, default=200, help="How often to perform weight mirroring")
+    parser.add_argument('-bls', '--block_size', type=int, default=0, help="Block size for skip connections")
+
 
     args = parser.parse_args()
 

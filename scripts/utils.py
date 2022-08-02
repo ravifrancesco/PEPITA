@@ -33,6 +33,7 @@ def create_arg_cfg(args):
     cfg.TRAINING.WMWD = args.wm_weight_decay
     cfg.TRAINING.PRE_MIRROR = args.pre_mirror
     cfg.TRAINING.MIRROR = args.mirror
+    cfg.TRAINING.BLOCK_SIZE = args.block_size
 
     cfg.PEPITA = CN()
     cfg.PEPITA.B_INIT = args.b_init

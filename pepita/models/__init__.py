@@ -26,6 +26,7 @@ def modelpool(MODELNAME, hparams):
         layers = [input_size] + hidden_layers + [n_classes]
         model = FCNet(
                 layers,
+                block_size=hparams.TRAINING.BLOCK_SIZE,
                 init=hparams.MODEL.FCNet.LAYER_INIT,
                 B_init=hparams.PEPITA.B_INIT,
                 B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
