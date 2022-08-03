@@ -239,9 +239,11 @@ class FCNet(nn.Module):
 
             if l == len(self.layers) - 1:
                 dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
+            elif (l + 1) % self.block_size:
+                dwl = (e @ self.get_B(l+1).T).T @ (modulated_activations[l - 1] if l != 0 else x)
             else:
                 dwl = (forward_activations[l] - modulated_activations[l]).T @ (
-                    modulated_activations[l - 1] if l != 0 else hl_err
+                    modulated_activations[l - 1] if l % self.block_size else hl_err #FIXME  l != 0 else hl_err Tests with l!=0
                 )
             layer[0].weight.grad = dwl / batch_size
             input = forward_activations[l]

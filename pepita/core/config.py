@@ -57,7 +57,7 @@ hparams.MODEL = CN()
 
 # Parameters for FCNet
 hparams.MODEL.FCNet = CN()
-hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024, 512, 216]
+hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024, 512, 256]
 hparams.MODEL.FCNet.LAYER_INIT = "he_normal"
 
 def get_hparams_defaults():
