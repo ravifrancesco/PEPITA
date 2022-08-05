@@ -11,7 +11,6 @@ from pepita.models.layers.ConsistentDropout import ConsistentDropout
 
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
 
-
 @torch.no_grad()
 def initialize_layer(layer, in_size, init="he_uniform"):
     r"""Initializes layer according to the input init mode
@@ -179,6 +178,11 @@ class FCNet(nn.Module):
         for l, layer in enumerate(self.layers):
             layer.register_forward_hook(collect_activations(self, l))
 
+        # TODO save std element for multiple use
+        self.sd = np.sqrt(2.0 / layer_sizes[0]) * Bstd
+        self.n = len(layer_sizes) - 1
+        self.el = np.prod(layer_sizes[1:-1])
+
         # Generating B
         self.Bs = generate_B(
             layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd
@@ -233,14 +237,12 @@ class FCNet(nn.Module):
         for l, layer in enumerate(self.layers):
 
             if not l % self.block_size and l != len(self.layers) - 1:
-                hl_err = input + (e @ self.get_B(l).T)
+                hl_err = input - (e @ self.get_B(l).T)
                 modulated_forward = self.forward(hl_err, start=l)
                 modulated_activations = self.get_activations()
 
             if l == len(self.layers) - 1:
                 dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
-            elif (l + 1) % self.block_size:
-                dwl = (e @ self.get_B(l+1).T).T @ (modulated_activations[l - 1] if l != 0 else x)
             else:
                 dwl = (forward_activations[l] - modulated_activations[l]).T @ (
                     modulated_activations[l - 1] if l % self.block_size else hl_err #FIXME  l != 0 else hl_err Tests with l!=0
@@ -273,12 +275,15 @@ class FCNet(nn.Module):
             noise_y = layer(noise_x)
             # update the backward weight matrices using the equation 7 of the paper manuscript
             update = noise_x.T @ noise_y / batch_size
-            if l == 0:
-                self.Bs[l].grad = update
-            else:
-                self.Bs[l].grad = -update
+            self.Bs[l].grad = -update
 
         self.reset_dropout_masks()
+
+    @torch.no_grad()
+    def normalize_B(self):
+        std = (self.sd / (self.el ** (1.0 / 2.0))) ** (1.0 / self.n)
+        for l in range(len(self.Bs)):
+            self.Bs[l] = (std / torch.std(self.Bs[l])) * self.Bs[l]
 
     @torch.no_grad()
     def get_B(self, layer=0):
@@ -312,6 +317,15 @@ class FCNet(nn.Module):
         return d
 
     @torch.no_grad()
+    def get_B_norm(self):
+        r"""Returns dict with norms of B matrixes"""
+        d = {}
+        d['total'] = torch.linalg.norm(self.get_B())
+        for i, b in enumerate(self.Bs):
+            d[f"layer{i}"] = torch.linalg.norm(b)
+        return d
+
+    @torch.no_grad()
     def compute_angle(self):
         r"""Returns alignment dictionary between feedforward and feedback matrices"""
         cost = 1 - spatial.distance.cosine(
@@ -326,3 +340,31 @@ class FCNet(nn.Module):
             ang = np.arccos(cos) * 180 / np.pi
             angles[f"al_layer{l}"] = ang
         return angles
+
+    @torch.no_grad()
+    def get_W_svalues(self):
+        r"""Returns singular values of the B matrices"""
+        d = {}
+        _, s, _ = np.linalg.svd(self.get_tot_weights())
+        d['total'] = np.max(s)
+        for i, w in enumerate(self.weights):
+            _, s, _ = np.linalg.svd(w)
+            d[f'layer{i}'] = np.max(s)
+        return d
+
+    @torch.no_grad()
+    def get_B_svalues(self):
+        r"""Returns singular values of the B matrices"""
+        d = {}
+        _, s, _ = np.linalg.svd(self.get_B())
+        d[f'total'] = np.max(s)
+        for i, b in enumerate(self.Bs):
+            _, s, _ = np.linalg.svd(b)
+            d[f'layer{i}'] = np.max(s)
+        return d
+
+    @torch.no_grad()
+    def get_total_svalues(self):
+        r"""Returns total singular values"""
+        _, s, _ = np.linalg.svd(self.get_tot_weights().T @ self.get_B().T)
+        return np.max(s)

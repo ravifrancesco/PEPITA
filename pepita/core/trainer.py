@@ -97,6 +97,12 @@ class PEPITATrainer(pl.LightningModule):
             opt_b.step()
             opt_b.zero_grad()
 
+            if (
+                self.current_epoch < self.premirror
+                or not (self.current_epoch + 1) % self.mirror
+            ):
+                self.model.normalize_B()
+
         return {"train_loss": loss, "train_acc": self.train_acc}
 
     def training_epoch_end(self, outputs):
@@ -115,7 +121,12 @@ class PEPITATrainer(pl.LightningModule):
             "train_acc": self.train_acc,
             "angle": self.model.compute_angle(),
             "weight_norms": self.model.get_weights_norm(),
-            "step": self.current_epoch,
+            "TOT_s_values": self.model.get_total_svalues(),
+            "B_s_values": self.model.get_B_svalues(),
+            "W_s_values": self.model.get_W_svalues(),
+            "B_norms": self.model.get_B_norm(),
+            "B_std": torch.std(self.model.get_B()),
+            "step": self.current_epoch
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 
