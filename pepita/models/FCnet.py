@@ -6,6 +6,11 @@ from loguru import logger
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+import pepita.models.activations as activations
+
+import random
 
 from pepita.models.layers.ConsistentDropout import ConsistentDropout
 
@@ -49,10 +54,16 @@ def generate_layer(in_size, out_size, p=0.1, final_layer=False, init="he_uniform
 
     if final_layer:
         a = nn.Softmax(dim=1)
+        # a = nn.Softmax()
+        #a = nn.Tanh()
+        # a = activations.ORU(r=5)
         return nn.Sequential(w, a)
     else:
         d = ConsistentDropout(p=p)
-        a = nn.ReLU()
+        # a = nn.ReLU()
+        # a = nn.Tanh()
+        # a = activations.ERU(r=5)
+        a = nn.Sigmoid()
         return nn.Sequential(w, d, a)
 
 
@@ -183,6 +194,8 @@ class FCNet(nn.Module):
         self.n = len(layer_sizes) - 1
         self.el = np.prod(layer_sizes[1:-1])
 
+        self.b_act = nn.Tanh()
+
         # Generating B
         self.Bs = generate_B(
             layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd
@@ -236,15 +249,15 @@ class FCNet(nn.Module):
 
         for l, layer in enumerate(self.layers):
 
-            if not l % self.block_size and l != len(self.layers) - 1:
+            if not l % self.block_size and l != len(self.layers) - 1: #FIXME adapt ot redsidual
                 hl_err = input - (e @ self.get_B(l).T)
                 modulated_forward = self.forward(hl_err, start=l)
                 modulated_activations = self.get_activations()
 
             if l == len(self.layers) - 1:
-                dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
+                dwl = (e / (forward_activations[l] + 1)).T @ (modulated_activations[l - 1] if l != 0 else x)
             else:
-                dwl = (forward_activations[l] - modulated_activations[l]).T @ (
+                dwl = ((forward_activations[l] - modulated_activations[l]) / (forward_activations[l] + 1)).T @ (
                     modulated_activations[l - 1] if l % self.block_size else hl_err #FIXME  l != 0 else hl_err Tests with l!=0
                 )
             layer[0].weight.grad = dwl / batch_size
@@ -280,10 +293,29 @@ class FCNet(nn.Module):
         self.reset_dropout_masks()
 
     @torch.no_grad()
+    def normalize_W(self):
+        # for l in range(len(self.Bs)):
+        #     std = np.sqrt(2.0 / self.weights[l].shape[1])
+        #     self.weights[l] *= (std / torch.std(self.weights[l]))
+        # for l in range(len(self.Bs)):
+        #     self.weights[l] *= (1 / torch.norm(self.weights[l]))
+        # for l in range(len(self.Bs)):
+        #     _, s, _ = np.linalg.svd(self.weights[l])
+        #     self.weights[l] *= (1 / np.max(s))
+        # for l in range(len(self.Bs)):
+        #     self.weights[l] *= (1 / self.get_total_svalues())
+        # for l in range(len(self.Bs)):
+        #     a = list(self.get_B_svalues().values())
+        #     b = list(self.get_W_svalues().values())
+        #     self.weights[l] *= (1 / (np.prod(a) * np.prod(b)))
+        for l in range(len(self.Bs)):
+            self.weights[l] *= (1 / torch.linalg.norm(self.get_tot_weights().T @ self.get_B().T)) # compute norm before and cant normalize all
+
+    @torch.no_grad()
     def normalize_B(self):
         std = (self.sd / (self.el ** (1.0 / 2.0))) ** (1.0 / self.n)
         for l in range(len(self.Bs)):
-            self.Bs[l] = (std / torch.std(self.Bs[l])) * self.Bs[l]
+            self.Bs[l] *= (std / torch.std(self.Bs[l]))
 
     @torch.no_grad()
     def get_B(self, layer=0):
@@ -345,26 +377,21 @@ class FCNet(nn.Module):
     def get_W_svalues(self):
         r"""Returns singular values of the B matrices"""
         d = {}
-        _, s, _ = np.linalg.svd(self.get_tot_weights())
-        d['total'] = np.max(s)
+        d['total'] = torch.linalg.norm(self.get_tot_weights(), ord=2)
         for i, w in enumerate(self.weights):
-            _, s, _ = np.linalg.svd(w)
-            d[f'layer{i}'] = np.max(s)
+            d[f'layer{i}'] = torch.linalg.norm(w, ord=2)
         return d
 
     @torch.no_grad()
     def get_B_svalues(self):
         r"""Returns singular values of the B matrices"""
         d = {}
-        _, s, _ = np.linalg.svd(self.get_B())
-        d[f'total'] = np.max(s)
+        d['total'] = torch.linalg.norm(self.get_B(), ord=2)
         for i, b in enumerate(self.Bs):
-            _, s, _ = np.linalg.svd(b)
-            d[f'layer{i}'] = np.max(s)
+            d[f'layer{i}'] = torch.linalg.norm(b, ord=2)
         return d
 
     @torch.no_grad()
     def get_total_svalues(self):
         r"""Returns total singular values"""
-        _, s, _ = np.linalg.svd(self.get_tot_weights().T @ self.get_B().T)
-        return np.max(s)
+        return torch.linalg.norm(self.get_tot_weights().T @ self.get_B().T, ord=2)

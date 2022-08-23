@@ -62,6 +62,8 @@ class PEPITATrainer(pl.LightningModule):
         self.premirror = self.hparams.TRAINING.PRE_MIRROR
         self.mirror = self.hparams.TRAINING.MIRROR
 
+        self.Wnorm = self.hparams.TRAINING.WNORM
+
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
 
@@ -81,6 +83,13 @@ class PEPITATrainer(pl.LightningModule):
             if self.current_epoch >= self.premirror:
                 self.model.modulated_forward(imgs, outputs - one_hot, imgs.shape[0])
 
+            loss = F.cross_entropy(outputs, gt)
+            self.train_acc(torch.argmax(outputs, -1), gt)
+
+            opt_w, opt_b = self.optimizers()
+            opt_w.step()
+            opt_w.zero_grad()
+
             # Perform weight mirroring
             if (
                 self.current_epoch < self.premirror
@@ -88,24 +97,40 @@ class PEPITATrainer(pl.LightningModule):
             ):
                 self.model.mirror_weights(imgs.shape[0])
 
-            loss = F.cross_entropy(outputs, gt)
-            self.train_acc(torch.argmax(outputs, -1), gt)
-
-            opt_w, opt_b = self.optimizers()
-            opt_w.step()
-            opt_w.zero_grad()
             opt_b.step()
             opt_b.zero_grad()
 
+            if self.Wnorm:
+                self.model.normalize_W()
+
+            #self.model.normalize_W()
             if (
                 self.current_epoch < self.premirror
                 or not (self.current_epoch + 1) % self.mirror
             ):
                 self.model.normalize_B()
 
+        # tensorboard_logs = {
+        #     #"train_loss": avg_loss,
+        #     "train_acc": self.train_acc,
+        #     "angle": self.model.compute_angle(),
+        #     "weight_norms": self.model.get_weights_norm(),
+        #     # "TOT_s_values": self.model.get_total_svalues(),
+        #     # "B_s_values": self.model.get_B_svalues(),
+        #     # "W_s_values": self.model.get_W_svalues(),
+        #     # "B_norms": self.model.get_B_norm(),
+        #     # "B_std": torch.std(self.model.get_B()),
+        #     #"step": self.current_epoch
+        #     "max_v": torch.max(outputs - one_hot)
+        # }
+        # self.log_dict(tensorboard_logs, prog_bar=True, on_step=True, on_epoch=False)
+
         return {"train_loss": loss, "train_acc": self.train_acc}
 
     def training_epoch_end(self, outputs):
+
+        # if self.Wnorm:
+        #     self.model.normalize_W()
 
         if self.current_epoch in self.hparams.TRAINING.DECAY_EPOCH:
             logger.info(
@@ -129,6 +154,7 @@ class PEPITATrainer(pl.LightningModule):
             "step": self.current_epoch
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
+
 
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():

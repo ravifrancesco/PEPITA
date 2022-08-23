@@ -34,6 +34,7 @@ def create_arg_cfg(args):
     cfg.TRAINING.PRE_MIRROR = args.pre_mirror
     cfg.TRAINING.MIRROR = args.mirror
     cfg.TRAINING.BLOCK_SIZE = args.block_size
+    cfg.TRAINING.WNORM = args.normalize_w
 
     cfg.PEPITA = CN()
     cfg.PEPITA.B_INIT = args.b_init

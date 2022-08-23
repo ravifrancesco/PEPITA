@@ -111,6 +111,7 @@ if __name__ == '__main__':
     parser.add_argument('-prm', '--pre_mirror', type=int, default=0, help="Number of epochs of pre mirroring")
     parser.add_argument('-mir', '--mirror', type=int, default=200, help="How often to perform weight mirroring")
     parser.add_argument('-bls', '--block_size', type=int, default=0, help="Block size for skip connections")
+    parser.add_argument('-nw', '--normalize_w', action='store_true', help='normalize W')
 
 
     args = parser.parse_args()
