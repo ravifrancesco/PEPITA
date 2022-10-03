@@ -222,7 +222,7 @@ class FCNet(nn.Module):
             modulated_forward (torch.Tensor): modulated output
         """
 
-        hl_err = x + (e @ self.get_B().T)
+        hl_err = x - (e @ self.get_B().T)
 
         forward_activations = self.get_activations()
         modulated_forward = self.forward(hl_err)
