@@ -276,7 +276,7 @@ class FCNet(nn.Module):
     @torch.no_grad()
     def normalize_B(self):
         r"""Normalizes Bs to keep std constant"""
-        std = np.sqrt(2.0 / self.layer_sizes[0]) ** self.Bstd
+        std = np.sqrt(2.0 / self.layer_sizes[0]) * self.Bstd # TODO look again
         for l in range(len(self.Bs)):
             self.Bs[l] *= torch.sqrt(std /  torch.std(self.get_B()))
 

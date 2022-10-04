@@ -11,6 +11,7 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
+import ray
 from ray import tune
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
@@ -21,7 +22,7 @@ from pepita.core.config import update_hparams_from_dict
 from pepita.utils.train_utils import seed_everything
 from utils import create_grid_search_dict
 
-def main(cfg_dict):
+def main(cfg_dict, cpus=4, gpus=0):
 
     log_dir = f"experiments/{cfg_dict['EXP_NAME']}/logs"
     seed_everything(cfg_dict["SEED_VALUE"])
@@ -33,6 +34,8 @@ def main(cfg_dict):
     )
 
     logger.info('*** Started grid search ***')
+
+    ray.init(num_gpus=gpus, num_cpus=cpus)
 
     analysis = tune.run(
         train_model,
@@ -48,12 +51,10 @@ def main(cfg_dict):
     logger.info(analysis.best_config)
 
 def train_model(config, fast_dev_run=False):
-    
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     hparams = update_hparams_from_dict(str(config))
 
-    model = PEPITATrainer(hparams=hparams).to(device)
+    model = PEPITATrainer(hparams=hparams)
 
     metrics = {"val_acc": "val_acc"}
 
@@ -65,7 +66,7 @@ def train_model(config, fast_dev_run=False):
         #checkpoint_callback=ckpt_callback,
         callbacks=[TuneReportCallback(metrics, on="validation_end")],
         #terminate_on_nan=True,
-        #progress_bar_refresh_rate=0,
+        progress_bar_refresh_rate=0,
         check_val_every_n_epoch=hparams.TRAINING.CHECK_VAL_EVERY_N_EPOCH,
         #resume_from_checkpoint=hparams.TRAINING.RESUME,
         num_sanity_val_steps=0,
@@ -79,6 +80,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-en', '--exp_name', type=str, default='exp', help="Experiment name")
+    parser.add_argument('-cpu', '--cpus', type=int, default=4, help="Number of CPU cores")
+    parser.add_argument('-gpu', '--gpus', type=int, default=0, help="Number of GPUs")
     parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
     parser.add_argument('-d', '--dataset', type=str, default='cifar10', help="Dataset")
     parser.add_argument('-s', '--seed', type=int, help="Seed value")
@@ -106,4 +109,4 @@ if __name__ == '__main__':
 
     cfg_dict = create_grid_search_dict(args)
 
-    main(cfg_dict)
+    main(cfg_dict, cpus=args.cpus, gpus=args.gpus)
