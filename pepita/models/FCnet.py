@@ -60,10 +60,10 @@ def generate_layer(in_size, out_size, p=0.1, final_layer=False, init="he_uniform
         return nn.Sequential(w, a)
     else:
         d = ConsistentDropout(p=p)
-        # a = nn.ReLU()
+        a = nn.ReLU()
         # a = nn.Tanh()
         # a = activations.ERU(r=5)
-        a = nn.Sigmoid()
+        # a = nn.Sigmoid()
         return nn.Sequential(w, d, a)
 
 
@@ -174,6 +174,8 @@ class FCNet(nn.Module):
             )
         )
 
+        self.layer_sizes = layer_sizes
+
         self.layers = nn.Sequential(*self.layers_list)
 
         if B_init=='uniform' and block_size > 0:
@@ -255,15 +257,28 @@ class FCNet(nn.Module):
                 modulated_activations = self.get_activations()
 
             if l == len(self.layers) - 1:
-                dwl = (e / (forward_activations[l] + 1)).T @ (modulated_activations[l - 1] if l != 0 else x)
+                # dwl = (e / (forward_activations[l] + 1e-1)).T @ (modulated_activations[l - 1] if l != 0 else x)
+                dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
             else:
-                dwl = ((forward_activations[l] - modulated_activations[l]) / (forward_activations[l] + 1)).T @ (
+                # dwl = ((forward_activations[l] - modulated_activations[l]) / (forward_activations[l] + 1e-1)).T @ (
+                #     modulated_activations[l - 1] if l % self.block_size else hl_err #FIXME  l != 0 else hl_err Tests with l!=0
+                # )
+                dwl = ((forward_activations[l] - modulated_activations[l])).T @ (
                     modulated_activations[l - 1] if l % self.block_size else hl_err #FIXME  l != 0 else hl_err Tests with l!=0
                 )
+                # FIXME test
+                # if l==2:
+                #     test_diff = forward_activations[l] - modulated_activations[l]
+                #     test = modulated_activations[l - 1]
+
+            # print(f'norm {l}: {torch.norm(layer[0].weight)}')
             layer[0].weight.grad = dwl / batch_size
             input = forward_activations[l]
 
         self.reset_dropout_masks()
+
+        # FIXME test
+        # return torch.abs(test_diff), torch.abs(test)
 
     @torch.no_grad()
     def mirror_weights(self, batch_size, noise_amplitude=0.1):
@@ -313,9 +328,12 @@ class FCNet(nn.Module):
 
     @torch.no_grad()
     def normalize_B(self):
-        std = (self.sd / (self.el ** (1.0 / 2.0))) ** (1.0 / self.n)
+        # std = (self.sd / (self.el ** (1.0 / 2.0))) ** (1.0 / self.n)
+        # for l in range(len(self.Bs)):
+        #     self.Bs[l] *= (std / torch.std(self.Bs[l]))
+        std = np.sqrt(2.0 / self.layer_sizes[0]) * 0.05
         for l in range(len(self.Bs)):
-            self.Bs[l] *= (std / torch.std(self.Bs[l]))
+            self.Bs[l] *= torch.sqrt(std /  torch.std(self.get_B()))
 
     @torch.no_grad()
     def get_B(self, layer=0):
@@ -389,6 +407,42 @@ class FCNet(nn.Module):
         d['total'] = torch.linalg.norm(self.get_B(), ord=2)
         for i, b in enumerate(self.Bs):
             d[f'layer{i}'] = torch.linalg.norm(b, ord=2)
+        return d
+
+    @torch.no_grad()
+    def get_B_stds(self):
+        r"""Returns stds of the B matrices"""
+        d = {}
+        d['total'] = torch.std(self.get_B())
+        for i, b in enumerate(self.Bs):
+            d[f'layer{i}'] = torch.std(b)
+        return d
+
+    @torch.no_grad()
+    def get_B_means(self):
+        r"""Returns means of the B matrices"""
+        d = {}
+        d['total'] = torch.mean(self.get_B())
+        for i, b in enumerate(self.Bs):
+            d[f'layer{i}'] = torch.mean(b)
+        return d
+
+    @torch.no_grad()
+    def get_W_stds(self):
+        r"""Returns stds of the W matrices"""
+        d = {}
+        d['total'] = torch.std(self.get_tot_weights())
+        for i, w in enumerate(self.weights):
+            d[f'layer{i}'] = torch.std(w)
+        return d
+
+    @torch.no_grad()
+    def get_W_means(self):
+        r"""Returns stds of the W matrices"""
+        d = {}
+        d['total'] = torch.mean(self.get_tot_weights())
+        for i, w in enumerate(self.weights):
+            d[f'layer{i}'] = torch.mean(w)
         return d
 
     @torch.no_grad()

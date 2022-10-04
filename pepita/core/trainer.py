@@ -79,6 +79,8 @@ class PEPITATrainer(pl.LightningModule):
 
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
+            test = 0
+            test_diff = 0
             # Compute modulated activations
             if self.current_epoch >= self.premirror:
                 self.model.modulated_forward(imgs, outputs - one_hot, imgs.shape[0])
@@ -86,7 +88,7 @@ class PEPITATrainer(pl.LightningModule):
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
 
-            opt_w, opt_b = self.optimizers()
+            opt_w, _ = self.optimizers()
             opt_w.step()
             opt_w.zero_grad()
 
@@ -97,18 +99,20 @@ class PEPITATrainer(pl.LightningModule):
             ):
                 self.model.mirror_weights(imgs.shape[0])
 
+            _, opt_b = self.optimizers()
             opt_b.step()
             opt_b.zero_grad()
 
-            if self.Wnorm:
-                self.model.normalize_W()
-
-            #self.model.normalize_W()
             if (
                 self.current_epoch < self.premirror
                 or not (self.current_epoch + 1) % self.mirror
             ):
                 self.model.normalize_B()
+
+
+            if self.Wnorm:
+                self.model.normalize_W()
+
 
         # tensorboard_logs = {
         #     #"train_loss": avg_loss,
@@ -121,7 +125,9 @@ class PEPITATrainer(pl.LightningModule):
         #     # "B_norms": self.model.get_B_norm(),
         #     # "B_std": torch.std(self.model.get_B()),
         #     #"step": self.current_epoch
-        #     "max_v": torch.max(outputs - one_hot)
+        #     "max_v": torch.max(outputs - one_hot),
+        #     "max": {'diff' : torch.max(test_diff), 'sec': torch.max(test)},
+        #     "mean": {'diff' : torch.mean(test_diff), 'sec': torch.mean(test)}
         # }
         # self.log_dict(tensorboard_logs, prog_bar=True, on_step=True, on_epoch=False)
 
@@ -150,7 +156,10 @@ class PEPITATrainer(pl.LightningModule):
             "B_s_values": self.model.get_B_svalues(),
             "W_s_values": self.model.get_W_svalues(),
             "B_norms": self.model.get_B_norm(),
-            "B_std": torch.std(self.model.get_B()),
+            "B_stds": self.model.get_B_stds(),
+            "B_means": self.model.get_B_means(),
+            "W_stds": self.model.get_W_stds(),
+            "W_means": self.model.get_W_means(),
             "step": self.current_epoch
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
