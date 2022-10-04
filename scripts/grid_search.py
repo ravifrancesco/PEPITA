@@ -1,0 +1,109 @@
+import os
+import sys
+from threading import local
+from turtle import update
+import torch
+import argparse
+
+from loguru import logger
+
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
+
+from ray import tune
+from ray.tune.integration.pytorch_lightning import TuneReportCallback
+
+sys.path.append('')
+
+from pepita.core.trainer import PEPITATrainer
+from pepita.core.config import update_hparams_from_dict
+from pepita.utils.train_utils import seed_everything
+from utils import create_grid_search_dict
+
+def main(cfg_dict):
+
+    log_dir = f"experiments/{cfg_dict['EXP_NAME']}/logs"
+    seed_everything(cfg_dict["SEED_VALUE"])
+
+    logger.add(
+        os.path.join(log_dir, 'train.log'),
+        level='INFO',
+        colorize=False,
+    )
+
+    logger.info('*** Started grid search ***')
+
+    analysis = tune.run(
+        train_model,
+        config=cfg_dict,
+        metric="val_acc",
+        mode="max",
+        name=cfg_dict["EXP_NAME"],
+        local_dir=f"experiments",
+    )
+
+    logger.info('*** Grid Search Ended ***')
+
+    logger.info(analysis.best_config)
+
+def train_model(config, fast_dev_run=False):
+    
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    hparams = update_hparams_from_dict(str(config))
+
+    model = PEPITATrainer(hparams=hparams).to(device)
+
+    metrics = {"val_acc": "val_acc"}
+
+    trainer = pl.Trainer(
+        #cgpus=1,
+        max_epochs=hparams.TRAINING.MAX_EPOCHS,
+        log_every_n_steps=50,
+        #enable_checkpointing=ckpt_callback,
+        #checkpoint_callback=ckpt_callback,
+        callbacks=[TuneReportCallback(metrics, on="validation_end")],
+        #terminate_on_nan=True,
+        #progress_bar_refresh_rate=0,
+        check_val_every_n_epoch=hparams.TRAINING.CHECK_VAL_EVERY_N_EPOCH,
+        #resume_from_checkpoint=hparams.TRAINING.RESUME,
+        num_sanity_val_steps=0,
+        fast_dev_run=fast_dev_run,
+        #limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1 FIXME change
+    )
+
+    trainer.fit(model)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-en', '--exp_name', type=str, default='exp', help="Experiment name")
+    parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
+    parser.add_argument('-d', '--dataset', type=str, default='cifar10', help="Dataset")
+    parser.add_argument('-s', '--seed', type=int, help="Seed value")
+    parser.add_argument('-w', '--workers', type=int, default=4, help="Number of workers")
+    parser.add_argument('-e', '--epochs', type=int, default=100, help="Number of epochs")
+    parser.add_argument('-dr', '--dropout', nargs='*', type=float, default=[0.1], help="Dropout rate")
+    parser.add_argument('-v', '--val_split', type=float, default=0.0, help="Validation split")
+    parser.add_argument('-lr', '--learning_rate', nargs='*', type=float, default=[0.01], help="Learning rate")
+    parser.add_argument('-wd', '--weight_decay', nargs='*', type=float, default=[0.0001], help="Weight decay")
+    parser.add_argument('-mom', '--momentum', nargs='*', type=float, default=[0.9], help="Learning rate")
+    parser.add_argument('-bs', '--batch_size', type=int, default=64, help="Momentum")
+    parser.add_argument('-au', '--augment', action='store_true', help='Data augmentation')
+    parser.add_argument('-lrd', '--decay', nargs='*', type=float, default=[0.1], help="Learning rate decay")
+    parser.add_argument('-de', '--decay_epoch', nargs='+', action='append', help='Learning rate decay epochs', default=[[60,90]])
+    parser.add_argument('-bi', '--b_init', type=str, help="B init mode", default='normal')
+    parser.add_argument('-bm', '--b_mean_zero', action='store_false', help="Mean of B is 0")
+    parser.add_argument('-bstd', '--bstd', nargs='*', type=float, default=[0.05], help="B standar deviation")
+    parser.add_argument('-n', '--normalize', action='store_true', help='normalize data')
+    parser.add_argument('-wmlr', '--wm_learning_rate', nargs='*', type=float, default=[0.01], help='Weight mirroring learning rate')
+    parser.add_argument('-wmwd', '--wm_weight_decay', nargs='*', type=float, default=[0.0001], help='Weight mirroring weight decay')
+    parser.add_argument('-prm', '--pre_mirror', nargs='*', type=int, default=[0], help="Number of epochs of pre mirroring")
+    parser.add_argument('-mir', '--mirror', nargs='*', type=int, default=[200], help="How often to perform weight mirroring")
+
+    args = parser.parse_args()
+
+    cfg_dict = create_grid_search_dict(args)
+
+    main(cfg_dict)
