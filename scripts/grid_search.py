@@ -27,7 +27,7 @@ def main(cfg_dict):
     seed_everything(cfg_dict["SEED_VALUE"])
 
     logger.add(
-        os.path.join(log_dir, 'train.log'),
+        os.path.join(log_dir, 'grid_search.log'),
         level='INFO',
         colorize=False,
     )
