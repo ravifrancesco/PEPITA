@@ -228,8 +228,6 @@ class FCNet(nn.Module):
         modulated_forward = self.forward(hl_err)
         modulated_activations = self.get_activations()
 
-        print(e)
-
         for l, layer in enumerate(self.layers):
             if l == len(self.layers) - 1:
                 dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
