@@ -79,7 +79,7 @@ class PEPITATrainer(pl.LightningModule):
 
             # Compute modulated activations
             if self.current_epoch >= self.premirror:
-                self.model.modulated_forward(imgs, outputs - one_hot, imgs.shape[0])
+                self.model.modulated_forward(imgs, outputs, one_hot, imgs.shape[0])
 
             # Perform weight mirroring
             if (
