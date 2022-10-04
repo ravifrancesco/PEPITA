@@ -227,16 +227,15 @@ class FCNet(nn.Module):
         """
         assert output_mode in ("modulated", "forward", "mixed"), "Output mode not recognized"
 
+        e = y - target  # TODO it would make more sense to get gt in input and compute one hot here.
         inp_err = x - (e @ self.get_B().T)
         forward_activations = self.get_activations()
         modulated_forward = self.forward(inp_err)
         modulated_activations = self.get_activations()
 
-        e = y - target  # TODO it would make more sense to get gt in input and compute one hot here.
         output_activations = forward_activations if output_mode == "forward" else modulated_activations
         hl_err = x if output_mode == "forward" else inp_err
 
-        print(e)
 
         if len(self.layers) == 1:  # limit case of one layer, just delta rule
             dwl = e.T @ x
