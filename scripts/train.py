@@ -71,6 +71,7 @@ def main(hparams, fast_dev_run=False):
         #resume_from_checkpoint=hparams.TRAINING.RESUME,
         num_sanity_val_steps=0,
         fast_dev_run=fast_dev_run,
+        progress_bar_refresh_rate=0,
         #limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1 FIXME change
     )
 
