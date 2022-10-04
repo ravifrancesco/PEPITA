@@ -105,9 +105,21 @@ def update_hparams_from_cfg(cfg):
     """Return an updated yacs hparamsNode
 
     Args:
+        cfg (cfg): cfg with the updated hparams
+    """
+    hparams = get_hparams_defaults()
+    hparams.merge_from_other_cfg(cfg)
+    update_paths(hparams)
+    return hparams.clone()
+
+def update_hparams_from_dict(cfg_dict):
+    """Return an updated yacs hparamsNode
+
+    Args:
         cfg_dict (dict): dict with the updated hparams
     """
     hparams = get_hparams_defaults()
+    cfg = hparams.load_cfg(str(cfg_dict))
     hparams.merge_from_other_cfg(cfg)
     update_paths(hparams)
     return hparams.clone()
