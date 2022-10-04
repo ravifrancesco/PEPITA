@@ -91,11 +91,26 @@ class PEPITATrainer(pl.LightningModule):
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
 
-            opt_w, opt_b = self.optimizers()
+            opt_w, _ = self.optimizers()
             opt_w.step()
             opt_w.zero_grad()
+
+            # Perform weight mirroring
+            if (
+                self.current_epoch < self.premirror
+                or not (self.current_epoch + 1) % self.mirror
+            ):
+                self.model.mirror_weights(imgs.shape[0])
+
+            _, opt_b = self.optimizers()
             opt_b.step()
             opt_b.zero_grad()
+
+            if (
+                self.current_epoch < self.premirror
+                or not (self.current_epoch + 1) % self.mirror
+            ):
+                self.model.normalize_B()
 
         return {"train_loss": loss, "train_acc": self.train_acc}
 

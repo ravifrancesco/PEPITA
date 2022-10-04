@@ -1,3 +1,4 @@
+from curses.ascii import BS
 import numpy as np
 
 from scipy import spatial
@@ -152,6 +153,8 @@ class FCNet(nn.Module):
             generate_layer(in_size, out_size, p=p, init=init)
             for in_size, out_size in zip(layer_sizes, layer_sizes[1:-1])
         ]
+
+        self.layer_sizes = layer_sizes
         self.layers_list.append(
             generate_layer(
                 layer_sizes[-2],
@@ -172,6 +175,7 @@ class FCNet(nn.Module):
             layer.register_forward_hook(collect_activations(self, l))
 
         # Generating B
+        self.Bstd = Bstd
         self.Bs = generate_B(
             layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd
         )
@@ -264,12 +268,17 @@ class FCNet(nn.Module):
             noise_y = layer(noise_x)
             # update the backward weight matrices using the equation 7 of the paper manuscript
             update = noise_x.T @ noise_y / batch_size
-            if l == 0:
-                self.Bs[l].grad = update
-            else:
-                self.Bs[l].grad = -update
+            self.Bs[l].grad = -update
 
         self.reset_dropout_masks()
+
+    
+    @torch.no_grad()
+    def normalize_B(self):
+        r"""Normalizes Bs to keep std constant"""
+        std = np.sqrt(2.0 / self.layer_sizes[0]) ** self.Bstd
+        for l in range(len(self.Bs)):
+            self.Bs[l] *= torch.sqrt(std /  torch.std(self.get_B()))
 
     @torch.no_grad()
     def get_B(self):
