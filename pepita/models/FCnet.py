@@ -76,7 +76,7 @@ def collect_activations(model, l):
     return hook
 
 
-def generate_B(layer_sizes, init="uniform", B_mean_zero=True, Bstd=0.05):
+def generate_B(layer_sizes, device, init="uniform", B_mean_zero=True, Bstd=0.05):
     r"""Helper function to generate the feedback matrix. If normal initialization is chosen, multiple matrices are generated
     (one per forward matrix).
 
@@ -94,10 +94,10 @@ def generate_B(layer_sizes, init="uniform", B_mean_zero=True, Bstd=0.05):
         sd = np.sqrt(6.0 / layer_sizes[-1])
         if B_mean_zero:
             Bs.append(
-                (torch.rand(layer_sizes[0], layer_sizes[-1]) * 2 * sd - sd) * Bstd
+                (torch.rand(layer_sizes[0], layer_sizes[-1], device=device) * 2 * sd - sd) * Bstd
             )
         else:
-            Bs.append((torch.rand(layer_sizes[0], layer_sizes[-1]) * sd) * Bstd)
+            Bs.append((torch.rand(layer_sizes[0], layer_sizes[-1], device=device) * sd) * Bstd)
         logger.info(f"Generated feedback matrix with shape {Bs[0].shape}")
     elif init.lower() == "normal":
         sd = np.sqrt(2.0 / layer_sizes[0]) * Bstd
@@ -105,7 +105,7 @@ def generate_B(layer_sizes, init="uniform", B_mean_zero=True, Bstd=0.05):
         el = np.prod(layer_sizes[1:-1])
         for i, (size0, size1) in enumerate(zip(layer_sizes, layer_sizes[1:])):
             Bs.append(
-                torch.empty(size0, size1).normal_(
+                torch.empty(size0, size1, device=device).normal_(
                     mean=0, std=(sd / (el ** (1.0 / 2.0))) ** (1.0 / n)
                 )
             )
@@ -177,7 +177,7 @@ class FCNet(nn.Module):
         # Generating B
         self.Bstd = Bstd
         self.Bs = generate_B(
-            layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd
+            layer_sizes, self.device, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd
         )
         if (len(self.Bs)) > 1:
             logger.info(

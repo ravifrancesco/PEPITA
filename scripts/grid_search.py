@@ -1,9 +1,11 @@
 import os
+import resource
 import sys
 from threading import local
 from turtle import update
 import torch
 import argparse
+import math
 
 from loguru import logger
 
@@ -12,7 +14,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
 
 import ray
-from ray import tune
+from ray import tune, air
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 
 sys.path.append('')
@@ -22,7 +24,7 @@ from pepita.core.config import update_hparams_from_dict
 from pepita.utils.train_utils import seed_everything
 from utils import create_grid_search_dict
 
-def main(cfg_dict, cpus=4, gpus=0):
+def main(cfg_dict, n_cpus=4, n_gpus=1):
 
     log_dir = f"experiments/{cfg_dict['EXP_NAME']}/logs"
     seed_everything(cfg_dict["SEED_VALUE"])
@@ -33,27 +35,38 @@ def main(cfg_dict, cpus=4, gpus=0):
         colorize=False,
     )
 
-    logger.info('*** Started grid search ***')
-
-    ray.init(num_gpus=gpus, num_cpus=cpus)
-
-    analysis = tune.run(
-        train_model,
-        config=cfg_dict,
-        metric="val_acc",
-        mode="max",
-        name=cfg_dict["EXP_NAME"],
-        local_dir=f"experiments",
+    tuner = tune.Tuner(
+        tune.with_resources(
+            tune.with_parameters(
+                train_model,
+                n_gpus=min(1, n_gpus)
+            ),
+            resources={"cpu" : min(4, n_cpus), "gpu": min(1, n_gpus)}
+        ),
+        tune_config=tune.TuneConfig(
+            metric="val_acc",
+            mode="max",
+            num_samples=1,
+        ),
+        param_space=cfg_dict,
+        run_config=air.RunConfig(
+            name=cfg_dict['EXP_NAME'],
+            local_dir=f"experiments"),
     )
+
+    logger.info('*** Started Grid Search ***')
+
+    results = tuner.fit()
 
     logger.info('*** Grid Search Ended ***')
 
-    logger.info(analysis.best_config)
+    logger.info(f'Best hyperparameters {results.get_best_result().config}')
 
-def train_model(config, fast_dev_run=False):
+def train_model(config, fast_dev_run=False, n_gpus=0):
 
     hparams = update_hparams_from_dict(str(config))
 
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = PEPITATrainer(hparams=hparams)
 
     metrics = {"val_acc": "val_acc"}
@@ -71,6 +84,8 @@ def train_model(config, fast_dev_run=False):
         #resume_from_checkpoint=hparams.TRAINING.RESUME,
         num_sanity_val_steps=0,
         fast_dev_run=fast_dev_run,
+        accelerator='gpu',
+        gpus=math.ceil(n_gpus),
         #limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1 FIXME change
     )
 
@@ -109,4 +124,6 @@ if __name__ == '__main__':
 
     cfg_dict = create_grid_search_dict(args)
 
-    main(cfg_dict, cpus=args.cpus, gpus=args.gpus)
+    ray.init(num_cpus=args.cpus, num_gpus=args.gpus)
+
+    main(cfg_dict, n_cpus=args.cpus, n_gpus=args.gpus)
