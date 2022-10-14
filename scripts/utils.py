@@ -41,6 +41,10 @@ def create_arg_cfg(args):
     cfg.PEPITA.B_MEAN_ZERO = args.b_mean_zero
     cfg.PEPITA.BSTD = args.bstd
 
+    cfg.MODEL = CN()
+    cfg.MODEL.FCNet = CN()
+    cfg.MODEL.FCNet.HIDDEN_LAYER_SIZES = args.layer_sizes
+
     return cfg
 
 def create_grid_search_dict(args):
@@ -80,5 +84,12 @@ def create_grid_search_dict(args):
             "B_INIT" : args.b_init,
             "B_MEAN_ZERO" : args.b_mean_zero,
             "BSTD" : tune.grid_search(args.bstd)
-        }
+        },
+
+        "MODEL" : {
+            "FCNet" : {
+                "HIDDEN_LAYER_SIZES" : args.layer_sizes
+            }
+        },
+
     }

@@ -185,7 +185,7 @@ class PEPITATrainer(pl.LightningModule):
             self.parameters(), lr=self.lr, momentum=self.mom, weight_decay=self.wd
         )
         # optimizer for feedback matrices
-        opt_b = torch.optim.SGD(self.model.Bs, lr=self.wmlr, weight_decay=self.wmwd)
+        opt_b = torch.optim.SGD(self.model.get_Bs(), lr=self.wmlr, weight_decay=self.wmwd)
         return opt_w, opt_b
 
     def train_dataloader(self):

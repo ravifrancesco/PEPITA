@@ -9,6 +9,7 @@ import torch
 import torch.nn as nn
 
 from pepita.models.layers.ConsistentDropout import ConsistentDropout
+from pepita.models.layers.RandomFeedback import RandomFeedback
 
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
 
@@ -76,46 +77,6 @@ def collect_activations(model, l):
     return hook
 
 
-def generate_B(layer_sizes, device, init="uniform", B_mean_zero=True, Bstd=0.05):
-    r"""Helper function to generate the feedback matrix. If normal initialization is chosen, multiple matrices are generated
-    (one per forward matrix).
-
-    Args:
-        layer_sizes (list(int)): size of layers of the networt
-        init (str, optional): initialization mode (default is 'uniform')
-        B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
-        Bstd (float, optional): standard deviation of the entries of the matrix (default is 0.05)
-
-    Returns:
-        Bs (list(torch.Tensor)): the feedback matrix (or matrices)
-    """
-    Bs = []
-    if init.lower() == "uniform":
-        sd = np.sqrt(6.0 / layer_sizes[-1])
-        if B_mean_zero:
-            Bs.append(
-                (torch.rand(layer_sizes[0], layer_sizes[-1], device=device) * 2 * sd - sd) * Bstd
-            )
-        else:
-            Bs.append((torch.rand(layer_sizes[0], layer_sizes[-1], device=device) * sd) * Bstd)
-        logger.info(f"Generated feedback matrix with shape {Bs[0].shape}")
-    elif init.lower() == "normal":
-        sd = np.sqrt(2.0 / layer_sizes[0]) * Bstd
-        n = len(layer_sizes) - 1
-        el = np.prod(layer_sizes[1:-1])
-        for i, (size0, size1) in enumerate(zip(layer_sizes, layer_sizes[1:])):
-            Bs.append(
-                torch.empty(size0, size1, device=device).normal_(
-                    mean=0, std=(sd / (el ** (1.0 / 2.0))) ** (1.0 / n)
-                )
-            )
-            logger.info(f"Generated feedback matrix {i} with shape {Bs[i].shape}")
-    else:
-        logger.error(f"B initialization '{init.lower()}' is not valid ")
-
-    return Bs
-
-
 class FCNet(nn.Module):
     r"""Fully connected network
 
@@ -175,11 +136,8 @@ class FCNet(nn.Module):
             layer.register_forward_hook(collect_activations(self, l))
 
         # Generating B
-        self.Bstd = Bstd
-        self.Bs = generate_B(
-            layer_sizes, self.device, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd
-        )
-        if (len(self.Bs)) > 1:
+        self.Bs = RandomFeedback(layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd)
+        if (len(self.get_Bs())) > 1:
             logger.info(
                 f"Expected STD = {torch.std(torch.empty(layer_sizes[0], layer_sizes[-1]).normal_(mean=0,std=np.sqrt(2.0 / layer_sizes[0])) * Bstd)}"
             )
@@ -226,7 +184,7 @@ class FCNet(nn.Module):
             modulated_forward (torch.Tensor): modulated output
         """
 
-        hl_err = x - (e @ self.get_B().T)
+        hl_err = x - self.Bs(e)
 
         forward_activations = self.get_activations()
         modulated_forward = self.forward(hl_err)
@@ -256,7 +214,7 @@ class FCNet(nn.Module):
             wmwd (float, optional): weigth decay (default is 0.0001)
         """
 
-        if len(self.weights) != len(self.Bs):
+        if len(self.weights) != len(self.get_Bs()):
             logger.error("The B initialization is not valid for performing mirroring")
             exit()
 
@@ -265,10 +223,12 @@ class FCNet(nn.Module):
                 torch.randn(batch_size, self.weights[l].shape[1])
             )
             noise_x -= torch.mean(noise_x).item()
+            device = next(layer.parameters()).device
+            noise_x = noise_x.to(device)
             noise_y = layer(noise_x)
             # update the backward weight matrices using the equation 7 of the paper manuscript
             update = noise_x.T @ noise_y / batch_size
-            self.Bs[l].grad = -update
+            self.get_Bs()[l].grad = -update.cpu()
 
         self.reset_dropout_masks()
 
@@ -276,17 +236,17 @@ class FCNet(nn.Module):
     @torch.no_grad()
     def normalize_B(self):
         r"""Normalizes Bs to keep std constant"""
-        std = np.sqrt(2.0 / self.layer_sizes[0]) * self.Bstd # TODO look again
-        for l in range(len(self.Bs)):
-            self.Bs[l] *= torch.sqrt(std /  torch.std(self.get_B()))
+        self.Bs.normalize_B()
 
     @torch.no_grad()
     def get_B(self):
         r"""Returns B (from output to input)"""
-        B = self.Bs[0]
-        for b in self.Bs[1:]:
-            B = B @ b
-        return B
+        return self.Bs.get_B()
+
+    @torch.no_grad()
+    def get_Bs(self):
+        r"""Returns Bs"""
+        return self.Bs.get_Bs()
 
     @torch.no_grad()
     def get_tot_weights(self):
@@ -308,13 +268,13 @@ class FCNet(nn.Module):
     def compute_angle(self):
         r"""Returns alignment dictionary between feedforward and feedback matrices"""
         cost = 1 - spatial.distance.cosine(
-            self.get_tot_weights().T.flatten(), self.get_B().flatten()
+            self.get_tot_weights().T.cpu().flatten(), self.get_B().cpu().flatten()
         )
         angt = np.arccos(cost) * 180 / np.pi
         angles = {"al_total": angt}
-        for l, b in enumerate(self.Bs):
+        for l, b in enumerate(self.get_Bs()):
             cos = 1 - spatial.distance.cosine(
-                self.weights[l].T.flatten(), self.Bs[l].flatten()
+                self.weights[l].T.cpu().flatten(), b.cpu().flatten()
             )
             ang = np.arccos(cos) * 180 / np.pi
             angles[f"al_layer{l}"] = ang

@@ -2,7 +2,6 @@ import os
 import resource
 import sys
 from threading import local
-from turtle import update
 import torch
 import argparse
 import math
@@ -16,6 +15,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 import ray
 from ray import tune, air
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
+from ray.tune.schedulers import ASHAScheduler
 
 sys.path.append('')
 
@@ -35,32 +35,39 @@ def main(cfg_dict, n_cpus=4, n_gpus=1):
         colorize=False,
     )
 
-    tuner = tune.Tuner(
-        tune.with_resources(
-            tune.with_parameters(
-                train_model,
-                n_gpus=min(1, n_gpus)
-            ),
-            resources={"cpu" : min(4, n_cpus), "gpu": min(1, n_gpus)}
-        ),
-        tune_config=tune.TuneConfig(
-            metric="val_acc",
-            mode="max",
-            num_samples=1,
-        ),
-        param_space=cfg_dict,
-        run_config=air.RunConfig(
-            name=cfg_dict['EXP_NAME'],
-            local_dir=f"experiments"),
+    asha_scheduler = ASHAScheduler(
+        max_t=100,
+        grace_period=10,
+        reduction_factor=3,
+        brackets=1
     )
 
     logger.info('*** Started Grid Search ***')
 
-    results = tuner.fit()
+    results = tune.run(
+        tune.with_parameters(
+            train_model,
+            n_gpus=min(1, n_gpus)
+        ),
+        resources_per_trial={"cpu" : min(4, n_cpus), "gpu": min(1, n_gpus)},
+        metric="val_acc",
+        mode="max",
+        num_samples=1,
+        config=cfg_dict,
+        scheduler=asha_scheduler,
+        name=cfg_dict['EXP_NAME'],
+        local_dir=f"experiments",
+        max_failures=5,
+    )
 
     logger.info('*** Grid Search Ended ***')
 
-    logger.info(f'Best hyperparameters {results.get_best_result().config}')
+    logger.info(f'Best result: {str(results.best_result)}')
+    logger.info(f'Best config: \n {str(results.best_config)}')
+
+    logger.info("Results")
+    logger.info('\t'+ results.dataframe().to_string().replace('\n', '\n\t'))
+    results.dataframe().to_pickle(f"experiments/{cfg_dict['EXP_NAME']}/trials.pkl")
 
 def train_model(config, fast_dev_run=False, n_gpus=0):
 
@@ -74,7 +81,8 @@ def train_model(config, fast_dev_run=False, n_gpus=0):
     trainer = pl.Trainer(
         #cgpus=1,
         max_epochs=hparams.TRAINING.MAX_EPOCHS,
-        log_every_n_steps=50,
+        logger=False,
+        checkpoint_callback=False,
         #enable_checkpointing=ckpt_callback,
         #checkpoint_callback=ckpt_callback,
         callbacks=[TuneReportCallback(metrics, on="validation_end")],
@@ -84,7 +92,6 @@ def train_model(config, fast_dev_run=False, n_gpus=0):
         #resume_from_checkpoint=hparams.TRAINING.RESUME,
         num_sanity_val_steps=0,
         fast_dev_run=fast_dev_run,
-        accelerator='gpu',
         gpus=math.ceil(n_gpus),
         #limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1 FIXME change
     )
@@ -98,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument('-cpu', '--cpus', type=int, default=4, help="Number of CPU cores")
     parser.add_argument('-gpu', '--gpus', type=int, default=0, help="Number of GPUs")
     parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
+    parser.add_argument('-ls', '--layer_sizes', nargs='*', type=int, default=[1024], help="sizes of the layers")
     parser.add_argument('-d', '--dataset', type=str, default='cifar10', help="Dataset")
     parser.add_argument('-s', '--seed', type=int, help="Seed value")
     parser.add_argument('-w', '--workers', type=int, default=4, help="Number of workers")

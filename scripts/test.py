@@ -27,13 +27,14 @@ def main(hparams):
     logger.info(f'Hyperparameters: \n {hparams}')
 
     logger.warning(f'Loading pretrained model from {hparams.MODEL_DIR}/model.ckpt')
-    model = PEPITATrainer.load_from_checkpoint(f'{hparams.MODEL_DIR}/model.ckpt', hparams=hparams).to(device)
+    model = PEPITATrainer.load_from_checkpoint(f'{hparams.MODEL_DIR}/model.ckpt', hparams=hparams)
 
     # most basic trainer, uses good defaults (1 gpu)
     trainer = pl.Trainer(
         #gpus=1,
         #resume_from_checkpoint=hparams.TRAINING.RESUME,
         logger=None,
+        gpus=1 if device=='cuda' else 0,
     )
 
     logger.info('*** Started testing ***')

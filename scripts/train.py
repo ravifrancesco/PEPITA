@@ -44,7 +44,7 @@ def main(hparams, fast_dev_run=False):
 
     experiment_loggers.append(tb_logger)
 
-    model = PEPITATrainer(hparams=hparams).to(device)
+    model = PEPITATrainer(hparams=hparams)
 
     ckpt_callback = ModelCheckpoint(
         monitor='validation_loss',
@@ -53,7 +53,7 @@ def main(hparams, fast_dev_run=False):
         save_top_k=1,
         mode='min',
         dirpath=hparams.MODEL_DIR,
-        filename="model-{epoch:02d}-{val_loss:.2f}"
+        filename="model-{epoch:02d}-{val_loss:.2f}",
     )
 
     trainer = pl.Trainer(
@@ -73,6 +73,7 @@ def main(hparams, fast_dev_run=False):
         fast_dev_run=fast_dev_run,
         progress_bar_refresh_rate=0,
         #limit_val_batches=0 if not hparams.TRAINING.VAL_SPLIT else 1 FIXME change
+        gpus=1 if device=='cuda' else 0,
     )
 
     save_config(hparams)
@@ -90,6 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('-fdr', '--fast_dev_run', action='store_true', help='fast dev run')
     parser.add_argument('-en', '--exp_name', type=str, default='exp', help="Experiment name")
     parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
+    parser.add_argument('-ls', '--layer_sizes', nargs='*', type=int, default=[1024], help="sizes of the layers")
     parser.add_argument('-d', '--dataset', type=str, default='cifar10', help="Dataset")
     parser.add_argument('-s', '--seed', type=int, help="Seed value")
     parser.add_argument('-w', '--workers', type=int, default=4, help="Number of workers")
