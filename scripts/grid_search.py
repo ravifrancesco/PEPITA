@@ -16,6 +16,7 @@ import ray
 from ray import tune, air
 from ray.tune.integration.pytorch_lightning import TuneReportCallback
 from ray.tune.schedulers import ASHAScheduler
+from ray.tune.result import NODE_IP
 
 sys.path.append('')
 
@@ -24,7 +25,7 @@ from pepita.core.config import update_hparams_from_dict
 from pepita.utils.train_utils import seed_everything
 from utils import create_grid_search_dict
 
-def main(cfg_dict, n_cpus=4, n_gpus=1):
+def main(cfg_dict, n_cpus=4, n_gpus=1, resume=False):
 
     log_dir = f"experiments/{cfg_dict['EXP_NAME']}/logs"
     seed_everything(cfg_dict["SEED_VALUE"])
@@ -42,6 +43,15 @@ def main(cfg_dict, n_cpus=4, n_gpus=1):
         brackets=1
     )
 
+    class ClearNodeIpCallback(tune.Callback):
+        def __init__(self):
+         self.reset_trials = set()
+
+        def on_trial_result(self, iteration, trials, trial, result):
+            if trial.trial_id not in self.reset_trials:
+                trial.last_result.pop(NODE_IP, None)
+                self.reset_trials.add(trial.trial_id)
+
     logger.info('*** Started Grid Search ***')
 
     results = tune.run(
@@ -58,6 +68,8 @@ def main(cfg_dict, n_cpus=4, n_gpus=1):
         name=cfg_dict['EXP_NAME'],
         local_dir=f"experiments",
         max_failures=5,
+        resume=resume,
+        callbacks=[ClearNodeIpCallback()],
     )
 
     logger.info('*** Grid Search Ended ***')
@@ -102,6 +114,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-en', '--exp_name', type=str, default='exp', help="Experiment name")
+    parser.add_argument('-res', '--resume', action='store_true', help='Resume experiment')
     parser.add_argument('-cpu', '--cpus', type=int, default=4, help="Number of CPU cores")
     parser.add_argument('-gpu', '--gpus', type=int, default=0, help="Number of GPUs")
     parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
@@ -134,4 +147,4 @@ if __name__ == '__main__':
 
     ray.init(num_cpus=args.cpus, num_gpus=args.gpus)
 
-    main(cfg_dict, n_cpus=args.cpus, n_gpus=args.gpus)
+    main(cfg_dict, n_cpus=args.cpus, n_gpus=args.gpus, resume=args.resume)
