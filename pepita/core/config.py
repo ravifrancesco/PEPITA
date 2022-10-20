@@ -8,7 +8,7 @@ import os
 sys.path.append("")
 
 ### CONSTANTS ###
-DATASET_DIR = {"CIFAR10": "../../datasets", "CIFAR100": "../../datasets"}
+DATASET_DIR = {"CIFAR10": "datasets", "CIFAR100": "datasets"}
 
 ### CONFIGS ###
 hparams = CN()
@@ -44,6 +44,7 @@ hparams.TRAINING.WMLR = 0.01
 hparams.TRAINING.WMWD = 0.0001
 hparams.TRAINING.PRE_MIRROR = 2
 hparams.TRAINING.MIRROR = 100
+hparams.TRAINING.MODE = "modulated"
 
 # PEPITA parameters
 hparams.PEPITA = CN()

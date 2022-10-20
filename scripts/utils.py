@@ -35,6 +35,7 @@ def create_arg_cfg(args):
     cfg.TRAINING.WMWD = args.wm_weight_decay
     cfg.TRAINING.PRE_MIRROR = args.pre_mirror
     cfg.TRAINING.MIRROR = args.mirror
+    cfg.TRAINING.MODE = args.mode
 
     cfg.PEPITA = CN()
     cfg.PEPITA.B_INIT = args.b_init
@@ -44,6 +45,7 @@ def create_arg_cfg(args):
     cfg.MODEL = CN()
     cfg.MODEL.FCNet = CN()
     cfg.MODEL.FCNet.HIDDEN_LAYER_SIZES = args.layer_sizes
+    cfg.MODEL.FCNet.LAYER_INIT = args.layer_init
 
     return cfg
 
@@ -78,6 +80,7 @@ def create_grid_search_dict(args):
             "WMWD" : tune.grid_search(args.wm_weight_decay),
             "PRE_MIRROR" : tune.grid_search(args.pre_mirror),
             "MIRROR" : tune.grid_search(args.mirror),
+            "MODE" : args.mode,
         },
 
         "PEPITA" : {
@@ -88,7 +91,8 @@ def create_grid_search_dict(args):
 
         "MODEL" : {
             "FCNet" : {
-                "HIDDEN_LAYER_SIZES" : args.layer_sizes
+                "HIDDEN_LAYER_SIZES" : args.layer_sizes,
+                "LAYER_INIT" : args.layer_init,
             }
         },
 

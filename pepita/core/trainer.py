@@ -62,6 +62,8 @@ class PEPITATrainer(pl.LightningModule):
         self.premirror = self.hparams.TRAINING.PRE_MIRROR
         self.mirror = self.hparams.TRAINING.MIRROR
 
+        self.mode = self.hparams.TRAINING.MODE
+
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
 
@@ -79,7 +81,7 @@ class PEPITATrainer(pl.LightningModule):
 
             # Compute modulated activations
             if self.current_epoch >= self.premirror:
-                self.model.modulated_forward(imgs, outputs - one_hot, imgs.shape[0])
+                self.model.modulated_forward(imgs, outputs, one_hot, imgs.shape[0])
 
             # Perform weight mirroring
             if (
@@ -97,7 +99,7 @@ class PEPITATrainer(pl.LightningModule):
 
             # Perform weight mirroring
             if (
-                self.current_epoch < self.premirror
+                False # self.current_epoch < self.premirror
                 or not (self.current_epoch + 1) % self.mirror
             ):
                 self.model.mirror_weights(imgs.shape[0])

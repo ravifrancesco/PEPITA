@@ -24,7 +24,7 @@ class RandomFeedback(nn.Module):
 
         self.Bs = []
         if init.lower() == "uniform":
-            sd = np.sqrt(6.0 / layer_sizes[-1])
+            sd = np.sqrt(6.0 / layer_sizes[0])
             if B_mean_zero:
                 B = (torch.rand(layer_sizes[0], layer_sizes[-1]) * 2 * sd - sd) * Bstd
                 self.Bs.append(B)
@@ -57,7 +57,7 @@ class RandomFeedback(nn.Module):
         r"""Normalizes Bs to keep std constant"""
         std = np.sqrt(2.0 / self.fan_in) * self.Bstd
         for l in range(len(self.Bs)):
-            self.Bs[l] *= torch.sqrt(std /  torch.std(self.get_B()))
+            self.Bs[l] *= torch.sqrt(std / torch.std(self.get_B()))
 
     @torch.no_grad()
     def get_Bs(self):

@@ -172,32 +172,59 @@ class FCNet(nn.Module):
         return self.layers(x)
 
     @torch.no_grad()
-    def modulated_forward(self, x, e, batch_size):
+    def modulated_forward(self, x, y, target, batch_size, output_mode="modulated"):
         r"""Updates the layers gradient according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
 
         Args:
             x (torch.Tensor): the network input
             e (torch.Tensor): the error computed at the output after the first forward pass
             batch_size (int): the batch size
+            output_mode (str): One of "forward", "modulated", "mixed". Indicates whether \
+                to use the first or second forward pass for the output term in the learning \
+                rule, or split the terms and use one each (fully Hebbian - fully anti-Hebbian).
 
         Returns:
             modulated_forward (torch.Tensor): modulated output
         """
 
-        hl_err = x - self.Bs(e)
+        assert output_mode in ("modulated", "forward", "mixed"), "Output mode not recognized"
+
+        e = y - target
+        inp_err = x - self.Bs(e)
 
         forward_activations = self.get_activations()
-        modulated_forward = self.forward(hl_err)
+        modulated_forward = self.forward(inp_err)
         modulated_activations = self.get_activations()
 
-        for l, layer in enumerate(self.layers):
-            if l == len(self.layers) - 1:
-                dwl = e.T @ (modulated_activations[l - 1] if l != 0 else x)
-            else:
-                dwl = (forward_activations[l] - modulated_activations[l]).T @ (
-                    modulated_activations[l - 1] if l != 0 else hl_err
-                )
-            layer[0].weight.grad = dwl / batch_size
+        output_activations = forward_activations if output_mode == "forward" else modulated_activations
+        hl_err = x if output_mode == "forward" else inp_err
+
+        if len(self.layers) == 1:  # limit case of one layer, just delta rule
+            dwl = e.T @ x
+            self.layers[0][0].weight.grad = dwl / batch_size
+
+        if output_mode == "mixed":
+            for l, layer in enumerate(self.layers):
+                if l == len(self.layers) - 1:
+                    dwl = y.T @ forward_activations[l - 1] - target.T @ modulated_activations[l - 1]
+                elif l == 0:
+                    dwl = forward_activations[l].T @ x - modulated_activations[l].T @ hl_err
+                else:
+                    dwl = (
+                        forward_activations[l].T @ forward_activations[l - 1] -
+                        modulated_activations[l].T @ modulated_activations[l - 1]
+                    )
+                layer[0].weight.grad = dwl / batch_size
+
+        else:  # original Pepita
+            for l, layer in enumerate(self.layers):
+                if l == len(self.layers) - 1:
+                    dwl = e.T @ output_activations[l - 1]
+                else:
+                    dwl = (forward_activations[l] - modulated_activations[l]).T @ (
+                        output_activations[l - 1] if l != 0 else hl_err
+                    )
+                layer[0].weight.grad = dwl / batch_size
 
         self.reset_dropout_masks()
 
@@ -272,10 +299,11 @@ class FCNet(nn.Module):
         )
         angt = np.arccos(cost) * 180 / np.pi
         angles = {"al_total": angt}
-        for l, b in enumerate(self.get_Bs()):
-            cos = 1 - spatial.distance.cosine(
-                self.weights[l].T.cpu().flatten(), b.cpu().flatten()
-            )
-            ang = np.arccos(cos) * 180 / np.pi
-            angles[f"al_layer{l}"] = ang
+        if len(self.get_Bs()) > 1:
+            for l, b in enumerate(self.get_Bs()):
+                cos = 1 - spatial.distance.cosine(
+                    self.weights[l].T.cpu().flatten(), b.cpu().flatten()
+                )
+                ang = np.arccos(cos) * 180 / np.pi
+                angles[f"al_layer{l}"] = ang
         return angles
