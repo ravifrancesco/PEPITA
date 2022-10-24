@@ -99,14 +99,13 @@ class PEPITATrainer(pl.LightningModule):
 
             # Perform weight mirroring
             if (
-                False # self.current_epoch < self.premirror
+                self.current_epoch < self.premirror
                 or not (self.current_epoch + 1) % self.mirror
             ):
                 self.model.mirror_weights(imgs.shape[0])
-
-            _, opt_b = self.optimizers()
-            opt_b.step()
-            opt_b.zero_grad()
+                _, opt_b = self.optimizers()
+                opt_b.step()
+                opt_b.zero_grad()
 
             if (
                 self.current_epoch < self.premirror
@@ -133,6 +132,7 @@ class PEPITATrainer(pl.LightningModule):
             "angle": self.model.compute_angle(),
             "weight_norms": self.model.get_weights_norm(),
             "step": self.current_epoch,
+            # "b_norms" : self.model.get_B_norm(),
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 

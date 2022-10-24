@@ -292,6 +292,14 @@ class FCNet(nn.Module):
         return d
 
     @torch.no_grad()
+    def get_B_norm(self):
+        r"""Returns dict with norms of weight matrixes"""
+        d = {}
+        for i, b in enumerate(self.get_Bs()):
+            d[f"layer{i}"] = torch.linalg.norm(b)
+        return d
+
+    @torch.no_grad()
     def compute_angle(self):
         r"""Returns alignment dictionary between feedforward and feedback matrices"""
         cost = 1 - spatial.distance.cosine(

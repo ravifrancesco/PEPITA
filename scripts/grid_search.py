@@ -140,6 +140,8 @@ if __name__ == '__main__':
     parser.add_argument('-wmwd', '--wm_weight_decay', nargs='*', type=float, default=[0.0001], help='Weight mirroring weight decay')
     parser.add_argument('-prm', '--pre_mirror', nargs='*', type=int, default=[0], help="Number of epochs of pre mirroring")
     parser.add_argument('-mir', '--mirror', nargs='*', type=int, default=[200], help="How often to perform weight mirroring")
+    parser.add_argument('-md', '--mode', type=str, default="modulated", help="Modulated pass mode")
+
 
     args = parser.parse_args()
 
