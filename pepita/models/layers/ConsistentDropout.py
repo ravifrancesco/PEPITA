@@ -62,6 +62,7 @@ class ConsistentDropout(nn.Module):
         if self.training:
             if self.mask is None:
                 self.mask = self._create_mask(input)
-            return input*self.mask
+            self.mask = self.mask.to(input.device)
+            return torch.mul(input, self.mask)
         else:
             return input

@@ -44,6 +44,7 @@ hparams.TRAINING.WMLR = 0.01
 hparams.TRAINING.WMWD = 0.0001
 hparams.TRAINING.PRE_MIRROR = 2
 hparams.TRAINING.MIRROR = 100
+hparams.TRAINING.MODE = "modulated"
 
 # PEPITA parameters
 hparams.PEPITA = CN()
@@ -56,7 +57,7 @@ hparams.MODEL = CN()
 
 # Parameters for FCNet
 hparams.MODEL.FCNet = CN()
-hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024, 512, 216]
+hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024]
 hparams.MODEL.FCNet.LAYER_INIT = "he_normal"
 
 

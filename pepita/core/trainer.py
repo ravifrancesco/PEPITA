@@ -62,6 +62,8 @@ class PEPITATrainer(pl.LightningModule):
         self.premirror = self.hparams.TRAINING.PRE_MIRROR
         self.mirror = self.hparams.TRAINING.MIRROR
 
+        self.mode = self.hparams.TRAINING.MODE
+
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
 
@@ -79,7 +81,7 @@ class PEPITATrainer(pl.LightningModule):
 
             # Compute modulated activations
             if self.current_epoch >= self.premirror:
-                self.model.modulated_forward(imgs, outputs - one_hot, imgs.shape[0])
+                self.model.modulated_forward(imgs, outputs, one_hot, imgs.shape[0])
 
             # Perform weight mirroring
             if (
@@ -91,11 +93,25 @@ class PEPITATrainer(pl.LightningModule):
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
 
-            opt_w, opt_b = self.optimizers()
+            opt_w, _ = self.optimizers()
             opt_w.step()
             opt_w.zero_grad()
-            opt_b.step()
-            opt_b.zero_grad()
+
+            # Perform weight mirroring
+            if (
+                self.current_epoch < self.premirror
+                or not (self.current_epoch + 1) % self.mirror
+            ):
+                self.model.mirror_weights(imgs.shape[0])
+                _, opt_b = self.optimizers()
+                opt_b.step()
+                opt_b.zero_grad()
+
+            if (
+                self.current_epoch < self.premirror
+                or not (self.current_epoch + 1) % self.mirror
+            ):
+                self.model.normalize_B()
 
         return {"train_loss": loss, "train_acc": self.train_acc}
 
@@ -116,6 +132,7 @@ class PEPITATrainer(pl.LightningModule):
             "angle": self.model.compute_angle(),
             "weight_norms": self.model.get_weights_norm(),
             "step": self.current_epoch,
+            # "b_norms" : self.model.get_B_norm(),
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 
@@ -170,7 +187,7 @@ class PEPITATrainer(pl.LightningModule):
             self.parameters(), lr=self.lr, momentum=self.mom, weight_decay=self.wd
         )
         # optimizer for feedback matrices
-        opt_b = torch.optim.SGD(self.model.Bs, lr=self.wmlr, weight_decay=self.wmwd)
+        opt_b = torch.optim.SGD(self.model.get_Bs(), lr=self.wmlr, weight_decay=self.wmwd)
         return opt_w, opt_b
 
     def train_dataloader(self):

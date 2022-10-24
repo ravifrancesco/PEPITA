@@ -63,7 +63,7 @@ def get_cifar10(batchsize, val_split=0.2, augment=False, num_workers=8, normaliz
     train_data = datasets.CIFAR10(DATASET_DIR['CIFAR10'], train=True, transform=trans_t, download=True)
     test_data = datasets.CIFAR10(DATASET_DIR['CIFAR10'], train=False, transform=trans, download=True)
     train_data, val_data = train_val_dataset(train_data, val_split=val_split)
-    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=num_workers, pin_memory=True)
+    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
     val_dataloader = DataLoader(val_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
     test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
 
@@ -102,7 +102,7 @@ def get_cifar100(batchsize, val_split=0.2, augment=False, num_workers=8, normali
     train_data = datasets.CIFAR100(DATASET_DIR['CIFAR100'], train=True, transform=trans_t, download=True)
     test_data = datasets.CIFAR100(DATASET_DIR['CIFAR100'], train=False, transform=trans, download=True)
     train_data, val_data = train_val_dataset(train_data, val_split=val_split)
-    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=num_workers, pin_memory=True)
+    train_dataloader = DataLoader(train_data, batch_size=batchsize, shuffle=True, num_workers=num_workers, pin_memory=True, drop_last=True)
     val_dataloader = DataLoader(val_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
     test_dataloader = DataLoader(test_data, batch_size=batchsize, shuffle=False, num_workers=num_workers, pin_memory=True)
 
