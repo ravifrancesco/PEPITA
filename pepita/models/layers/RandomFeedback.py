@@ -8,7 +8,7 @@ import numpy as np
 class RandomFeedback(nn.Module):
     r"""Random feedback layer (see paper for further detail)
     """
-    def __init__(self, layer_sizes, init="uniform", B_mean_zero=True, Bstd=0.05):
+    def __init__(self, layer_sizes, init="uniform", B_mean_zero=True, Bstd=0.05, input_shape=None):
         r"""If normal initialization is chosen, multiple matrices are generated(one per forward matrix).
 
         Args:
@@ -16,11 +16,13 @@ class RandomFeedback(nn.Module):
             init (str, optional): initialization mode (default is 'uniform')
             B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
             Bstd (float, optional): standard deviation of the entries of the matrix (default is 0.05)
+            input_shape (tuple, optional): if given, reshape the output to this shape (corresponding to the image input shape, excl batch)
         """
         super().__init__()
 
         self.fan_in = layer_sizes[0]
         self.Bstd = Bstd
+        self.input_shape = input_shape
 
         self.Bs = []
         if init.lower() == "uniform":
@@ -50,7 +52,10 @@ class RandomFeedback(nn.Module):
     @torch.no_grad()
     def forward(self, input: torch.Tensor):
         r"""Computes projection of input to input space"""
-        return input @ self.get_B().T.to(input.device) 
+        out = input @ self.get_B().T.to(input.device)
+        if self.input_shape is not None:
+            out = out.reshape((-1, *self.input_shape))
+        return out
 
     @torch.no_grad()
     def normalize_B(self):
