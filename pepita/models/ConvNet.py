@@ -18,7 +18,7 @@ from pepita.models.FCnet import (
 
 
 @torch.no_grad()
-def generate_conv_layer(in_size, out_size, stride=1, padding=0, final_layer=False, init="he_uniform"):
+def generate_conv_layer(in_size, out_size, kernel=3, stride=1, padding=0, final_layer=False, init="he_uniform"):
     r"""Helper function to generate a Fully Connected block
 
     Args:
@@ -30,21 +30,16 @@ def generate_conv_layer(in_size, out_size, stride=1, padding=0, final_layer=Fals
     Returns:
         Fully connected block (nn.Sequential): fully connected block of the specified dimensions
     """
-    w = nn.Conv2d(
-        in_size,
-        out_size,
-        kernel_size=3,
-        stride=stride,
-        padding=padding,
-        bias=False
-    )
+    w = nn.Conv2d(in_size, out_size, kernel_size=kernel,
+            stride=stride, padding=padding, bias=False)
+    u = nn.Unfold(kernel_size=(kernel, kernel), stride=(stride, stride), padding=(padding, padding))
     initialize_layer(w, in_size, init)
 
     if final_layer:
         a = nn.Softmax(dim=1)
     else:
         a = nn.ReLU()
-    return nn.Sequential(w, a)
+    return nn.Sequential(w, a), u
 
 
 class ConvNet(FCNet):
@@ -84,10 +79,12 @@ class ConvNet(FCNet):
 
         # Generating network
         # Convolutional stack
-        self.layers_list = [
-            generate_conv_layer(in_size, out_size, init=init)
-            for in_size, out_size in zip(conv_channels, conv_channels[1:])
-        ]
+        self.layers_list, self.unfold_objects = [], []
+        for in_size, out_size in zip(conv_channels, conv_channels[1:]):
+            conv, unfold = generate_conv_layer(
+                in_size, out_size, kernel=3, init=init, stride=2, padding=1)
+            self.layers_list.append(conv)
+            self.unfold_objects.append(unfold)
 
         # Final layers
         self.layers_list.append(nn.Flatten())
@@ -98,16 +95,16 @@ class ConvNet(FCNet):
         ))
 
         self.layers = nn.Sequential(*self.layers_list)
-        self.weights = [layer[0].weight for layer in self.layers]
+        # self.weights = [layer[0].weight for layer in self.layers]
         self.activations = [None] * len(self.layers)
  
         for l, layer in enumerate(self.layers):
             layer.register_forward_hook(collect_activations(self, l))
 
         # Generating B
-        layer_sizes = (conv_channels[0], n_classes)
+        layer_sizes = (conv_channels[0]*img_shape[0]*img_shape[1], n_classes)  # TODO this could be done better
         input_shape = (conv_channels[0], *img_shape)
-        self.Bs = RandomFeedback(layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd, img_shape=input_shape)
+        self.Bs = RandomFeedback(layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd, input_shape=input_shape)
 
     @torch.no_grad()
     def modulated_forward(self, x, y, target, batch_size, output_mode="modulated"):
@@ -142,114 +139,119 @@ class ConvNet(FCNet):
             self.layers[0][0].weight.grad = dwl / batch_size
 
         if output_mode == "mixed":
-            for l, layer in enumerate(self.layers):
-                if l == len(self.layers) - 1:
-                    dwl = y.T @ forward_activations[l - 1] - target.T @ modulated_activations[l - 1]
-                elif l == 0:
-                    dwl = forward_activations[l].T @ x - modulated_activations[l].T @ hl_err
-                else:
-                    dwl = (
-                        forward_activations[l].T @ forward_activations[l - 1] -
-                        modulated_activations[l].T @ modulated_activations[l - 1]
-                    )
-                layer[0].weight.grad = dwl / batch_size
+            raise NotImplementedError()
+            # for l, layer in enumerate(self.layers):
+            #     if l == len(self.layers) - 1:
+            #         dwl = y.T @ forward_activations[l - 1] - target.T @ modulated_activations[l - 1]
+            #     elif l == 0:
+            #         dwl = forward_activations[l].T @ x - modulated_activations[l].T @ hl_err
+            #     else:
+            #         dwl = (
+            #             forward_activations[l].T @ forward_activations[l - 1] -
+            #             modulated_activations[l].T @ modulated_activations[l - 1]
+            #         )
+            #     layer[0].weight.grad = dwl / batch_size
 
         else:  # original Pepita
             for l, layer in enumerate(self.layers):
-                if l == len(self.layers) - 1:
-                    dwl = e.T @ output_activations[l - 1]
-                else:
-                    dwl = (forward_activations[l] - modulated_activations[l]).T @ (
-                        output_activations[l - 1] if l != 0 else hl_err
-                    )
+                input_term = output_activations[l - 1] if l != 0 else hl_err
+                output_term = e if l == len(self.layers) - 1 else (forward_activations[l] - modulated_activations[l])
+                unfolded_in = self.unfold_objects[l](input_term)
+                k_h, k_w = self.unfold_objects[l].kernel_size
+
+                batchsize, ch_in, h_in, w_in = input_term.shape
+                batchsize, ch_out, h_out, w_out = output_term.shape
+                unfolded_in = unfolded_in.reshape(batchsize, ch_in, k_h, k_w, h_out, w_out)
+
+                dwl = torch.einsum("bcijhw, bkhw -> kcij", unfolded_in, output_term)
                 layer[0].weight.grad = dwl / batch_size
 
         self.reset_dropout_masks()
 
         return modulated_forward
 
-    @torch.no_grad()
-    def mirror_weights(self, batch_size, noise_amplitude=0.1):
-        r"""Perform weight mirroring
+    # @torch.no_grad()
+    # def mirror_weights(self, batch_size, noise_amplitude=0.1):
+    #     r"""Perform weight mirroring
 
-        Args:
-            batch_size (int): batch size
-            noise_amplitude (float, optional): noise amplitude (default is 0.1)
-            wmlr (float, optional): learning rate (default is 0.01)
-            wmwd (float, optional): weigth decay (default is 0.0001)
-        """
+    #     Args:
+    #         batch_size (int): batch size
+    #         noise_amplitude (float, optional): noise amplitude (default is 0.1)
+    #         wmlr (float, optional): learning rate (default is 0.01)
+    #         wmwd (float, optional): weigth decay (default is 0.0001)
+    #     """
 
-        if len(self.weights) != len(self.get_Bs()):
-            logger.error("The B initialization is not valid for performing mirroring")
-            exit()
+    #     if len(self.weights) != len(self.get_Bs()):
+    #         logger.error("The B initialization is not valid for performing mirroring")
+    #         exit()
 
-        for l, layer in enumerate(self.layers):
-            noise_x = noise_amplitude * (
-                torch.randn(batch_size, self.weights[l].shape[1])
-            )
-            noise_x -= torch.mean(noise_x).item()
-            device = next(layer.parameters()).device
-            noise_x = noise_x.to(device)
-            noise_y = layer(noise_x)
-            # update the backward weight matrices using the equation 7 of the paper manuscript
-            update = noise_x.T @ noise_y / batch_size
-            self.get_Bs()[l].grad = -update.cpu()
+    #     for l, layer in enumerate(self.layers):
+    #         noise_x = noise_amplitude * (
+    #             torch.randn(batch_size, self.weights[l].shape[1])
+    #         )
+    #         noise_x -= torch.mean(noise_x).item()
+    #         device = next(layer.parameters()).device
+    #         noise_x = noise_x.to(device)
+    #         noise_y = layer(noise_x)
+    #         # update the backward weight matrices using the equation 7 of the paper manuscript
+    #         update = noise_x.T @ noise_y / batch_size
+    #         self.get_Bs()[l].grad = -update.cpu()
 
-        self.reset_dropout_masks()
+    #     self.reset_dropout_masks()
 
     
-    @torch.no_grad()
-    def normalize_B(self):
-        r"""Normalizes Bs to keep std constant"""
-        self.Bs.normalize_B()
+    # @torch.no_grad()
+    # def normalize_B(self):
+    #     r"""Normalizes Bs to keep std constant"""
+    #     self.Bs.normalize_B()
 
-    @torch.no_grad()
-    def get_B(self):
-        r"""Returns B (from output to input)"""
-        return self.Bs.get_B()
+    # @torch.no_grad()
+    # def get_B(self):
+    #     r"""Returns B (from output to input)"""
+    #     return self.Bs.get_B()
 
-    @torch.no_grad()
-    def get_Bs(self):
-        r"""Returns Bs"""
-        return self.Bs.get_Bs()
+    # @torch.no_grad()
+    # def get_Bs(self):
+    #     r"""Returns Bs"""
+    #     return self.Bs.get_Bs()
 
-    @torch.no_grad()
-    def get_tot_weights(self):
-        r"""Returns the total weight matrix (input to output matrix)"""
-        weights = self.weights[0]
-        for w in self.weights[1:]:
-            weights = w @ weights
-        return weights
+    # @torch.no_grad()
+    # def get_tot_weights(self):
+    #     r"""Returns the total weight matrix (input to output matrix)"""
+    #     weights = self.weights[0]
+    #     for w in self.weights[1:]:
+    #         weights = w @ weights
+    #     return weights
 
-    @torch.no_grad()
-    def get_weights_norm(self):
-        r"""Returns dict with norms of weight matrixes"""
-        d = {}
-        for i, w in enumerate(self.weights):
-            d[f"layer{i}"] = torch.linalg.norm(w)
-        return d
+    # @torch.no_grad()
+    # def get_weights_norm(self):
+    #     r"""Returns dict with norms of weight matrixes"""
+    #     d = {}
+    #     for i, w in enumerate(self.weights):
+    #         d[f"layer{i}"] = torch.linalg.norm(w)
+    #     return d
 
-    @torch.no_grad()
-    def get_B_norm(self):
-        r"""Returns dict with norms of weight matrixes"""
-        d = {}
-        for i, b in enumerate(self.get_Bs()):
-            d[f"layer{i}"] = torch.linalg.norm(b)
-        return d
+    # @torch.no_grad()
+    # def get_B_norm(self):
+    #     r"""Returns dict with norms of weight matrixes"""
+    #     d = {}
+    #     for i, b in enumerate(self.get_Bs()):
+    #         d[f"layer{i}"] = torch.linalg.norm(b)
+    #     return d
 
-    @torch.no_grad()
-    def compute_angle(self):
-        r"""Returns alignment dictionary between feedforward and feedback matrices"""
-        cost = 1 - spatial.distance.cosine(
-            self.get_tot_weights().T.cpu().flatten(), self.get_B().cpu().flatten()
-        )
-        angt = np.arccos(cost) * 180 / np.pi
-        angles = {"al_total": angt}
-        if len(self.get_Bs()) > 1:
-            for l, b in enumerate(self.get_Bs()):
-                cos = 1 - spatial.distance.cosine(
-                    self.weights[l].T.cpu().flatten(), b.cpu().flatten()
-                )
-                ang = np.arccos(cos) * 180 / np.pi
-                angles[f"al_layer{l}"] = ang
-        return angles
+    # @torch.no_grad()
+    # def compute_angle(self):
+    #     r"""Returns alignment dictionary between feedforward and feedback matrices"""
+    #     cost = 1 - spatial.distance.cosine(
+    #         self.get_tot_weights().T.cpu().flatten(), self.get_B().cpu().flatten()
+    #     )
+    #     angt = np.arccos(cost) * 180 / np.pi
+    #     angles = {"al_total": angt}
+    #     if len(self.get_Bs()) > 1:
+    #         for l, b in enumerate(self.get_Bs()):
+    #             cos = 1 - spatial.distance.cosine(
+    #                 self.weights[l].T.cpu().flatten(), b.cpu().flatten()
+    #             )
+    #             ang = np.arccos(cos) * 180 / np.pi
+    #             angles[f"al_layer{l}"] = ang
+    #     return angles

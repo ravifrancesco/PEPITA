@@ -1,6 +1,7 @@
 from loguru import logger
 
 from .FCnet import FCNet
+from .ConvNet import ConvNet
 
 from ..dataset import get_data_info
 
@@ -32,7 +33,25 @@ def modelpool(MODELNAME, hparams):
                 Bstd=hparams.PEPITA.BSTD,
                 p=hparams.TRAINING.DROPOUT_P
             )
-        return model, input_size, n_classes, True
+        return model, (input_size, ), n_classes, True
+
+    elif MODELNAME.lower() == "convnet":
+        hidden_layers = hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES  # FIXME same for conv
+        fc_layer_size = 8192  # FIXME this should be an extra parameter, or could be inferred from img size
+        conv_layers_channels = [n_chan] + hidden_layers
+        model = ConvNet(
+            conv_channels=conv_layers_channels,
+            fc_layer_size=fc_layer_size,
+            n_classes=n_classes,
+            img_shape=(img_w, img_w),
+            fc_dropout_p=hparams.TRAINING.DROPOUT_P,
+            init=hparams.MODEL.FCNet.LAYER_INIT,  # FIXME same for conv
+            B_init=hparams.PEPITA.B_INIT,
+            B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
+            Bstd=hparams.PEPITA.BSTD,
+        )
+        return model, (n_chan, img_w, img_w), n_classes, False
+
     else:
         logger.error(f'Model \'{MODELNAME.lower()}\' is not implemented yet')
         exit() 

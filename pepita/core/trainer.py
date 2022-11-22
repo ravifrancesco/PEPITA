@@ -47,7 +47,7 @@ class PEPITATrainer(pl.LightningModule):
         self.model, self.input_size, self.n_classes, self.reshape = modelpool(
             self.hparams.MODEL_ARCH, self.hparams
         )
-        self.example_input_array = torch.rand((1, self.input_size))
+        self.example_input_array = torch.rand((1, *self.input_size))
 
         # Setting hyperparams
         self.lr = self.hparams.TRAINING.LR
@@ -74,7 +74,7 @@ class PEPITATrainer(pl.LightningModule):
         with torch.no_grad():
             imgs, gt = batch
             if self.reshape:
-                imgs = imgs.reshape(-1, self.input_size)
+                imgs = imgs.reshape(-1, *self.input_size)
             outputs = self(imgs)
 
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
@@ -140,7 +140,7 @@ class PEPITATrainer(pl.LightningModule):
         with torch.no_grad():
             imgs, gt = batch
             if self.reshape:
-                imgs = imgs.reshape(-1, self.input_size)
+                imgs = imgs.reshape(-1, *self.input_size)
             outputs = self(imgs)
 
             val_loss = F.cross_entropy(outputs, gt)
@@ -161,7 +161,7 @@ class PEPITATrainer(pl.LightningModule):
         with torch.no_grad():
             imgs, gt = batch
             if self.reshape:
-                imgs = imgs.reshape(-1, self.input_size)
+                imgs = imgs.reshape(-1, *self.input_size)
             outputs = self(imgs)
 
             test_loss = F.cross_entropy(outputs, gt)
