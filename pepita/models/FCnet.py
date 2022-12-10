@@ -160,7 +160,7 @@ class FCNet(nn.Module):
                 module.reset_mask()
 
     @torch.no_grad()
-    def forward(self, x):
+    def forward(self, x, batch_size, output_mode="modulated", modulated=False): # TODO doc
         r"""Computes the forward pass and returns the output
 
         Args:
@@ -169,10 +169,23 @@ class FCNet(nn.Module):
         Returns:
             output (torch.Tensor): the network output
         """
-        return self.layers(x)
+        out = self.layers(x)
+
+        if output_mode == "mixed_tl" and not modulated:
+            forward_activations = self.get_activations()
+            for l, layer in enumerate(self.layers):
+                if l == len(self.layers) - 1:
+                    dwl = out.T @ forward_activations[l - 1]
+                elif l == 0:
+                    dwl = forward_activations[l].T @ x
+                else:
+                    dwl = forward_activations[l].T @ forward_activations[l - 1]
+                layer[0].weight.grad = dwl / batch_size
+
+        return out
 
     @torch.no_grad()
-    def modulated_forward(self, x, y, target, batch_size, output_mode="modulated"):
+    def modulated_forward(self, x, y, target, batch_size, output_mode="modulated"): # TODO doc
         r"""Updates the layers gradient according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
 
         Args:
@@ -187,13 +200,14 @@ class FCNet(nn.Module):
             modulated_forward (torch.Tensor): modulated output
         """
 
-        assert output_mode in ("modulated", "forward", "mixed"), "Output mode not recognized"
-
+        assert output_mode in ("modulated", "forward", "mixed", "mixed_tl"), "Output mode not recognized"
+        
+        target = target.float()
         e = y - target
         inp_err = x - self.Bs(e)
 
         forward_activations = self.get_activations()
-        modulated_forward = self.forward(inp_err)
+        modulated_forward = self.forward(inp_err, batch_size, output_mode, modulated=True)
         modulated_activations = self.get_activations()
 
         output_activations = forward_activations if output_mode == "forward" else modulated_activations
@@ -215,6 +229,16 @@ class FCNet(nn.Module):
                         modulated_activations[l].T @ modulated_activations[l - 1]
                     )
                 layer[0].weight.grad = dwl / batch_size
+        
+        if output_mode == "mixed_tl":
+            for l, layer in enumerate(self.layers):
+                if l == len(self.layers) - 1:
+                    dwl = target.T @ modulated_activations[l - 1]
+                elif l == 0:
+                    dwl = modulated_activations[l].T @ hl_err
+                else:
+                    dwl =  modulated_activations[l].T @ modulated_activations[l - 1]
+                layer[0].weight.grad = - dwl / batch_size
 
         else:  # original Pepita
             for l, layer in enumerate(self.layers):
