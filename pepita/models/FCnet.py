@@ -160,7 +160,7 @@ class FCNet(nn.Module):
                 module.reset_mask()
 
     @torch.no_grad()
-    def forward(self, x, batch_size, output_mode="modulated", modulated=False): # TODO doc
+    def forward(self, x, batch_size, output_mode="modulated", first=False): # TODO doc
         r"""Computes the forward pass and returns the output
 
         Args:
@@ -171,7 +171,7 @@ class FCNet(nn.Module):
         """
         out = self.layers(x)
 
-        if output_mode == "mixed_tl" and not modulated:
+        if output_mode == "mixed_tl" and first:
             forward_activations = self.get_activations()
             for l, layer in enumerate(self.layers):
                 if l == len(self.layers) - 1:
@@ -207,7 +207,7 @@ class FCNet(nn.Module):
         inp_err = x - self.Bs(e)
 
         forward_activations = self.get_activations()
-        modulated_forward = self.forward(inp_err, batch_size, output_mode, modulated=True)
+        modulated_forward = self.forward(inp_err, batch_size, output_mode, first=False)
         modulated_activations = self.get_activations()
 
         output_activations = forward_activations if output_mode == "forward" else modulated_activations

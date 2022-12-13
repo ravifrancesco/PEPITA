@@ -72,8 +72,8 @@ class PEPITATrainer(pl.LightningModule):
         self.image = images[0].reshape(-1, self.input_size).cuda()
         self.label = labels[0].cuda()
 
-    def forward(self, x):
-        return self.model(x, x.shape[0], output_mode=self.mode)
+    def forward(self, x, first=True):
+        return self.model(x, x.shape[0], output_mode=self.mode, first=first)
 
     def training_step(self, batch, batch_idx):
         with torch.no_grad():
@@ -90,7 +90,7 @@ class PEPITATrainer(pl.LightningModule):
             imgs, gt = batch
             if self.reshape:
                 imgs = imgs.reshape(-1, self.input_size)
-            outputs = self.forward(imgs)
+            outputs = self.forward(imgs, first=True)
 
             if self.mode=='mixed_tl':
                 _, _, opt_w2 = self.optimizers()
@@ -142,8 +142,9 @@ class PEPITATrainer(pl.LightningModule):
                 f"Epoch {self.current_epoch} - Learning rate decay: {self.lr} -> {self.lr*self.lr_decay}"
             )
             self.lr = self.lr * self.lr_decay
-            opt_w, opt_b, _ = self.optimizers()
+            opt_w, opt_b, opt_w2 = self.optimizers()
             opt_w.param_groups[0]["lr"] = self.lr
+            opt_w2.param_groups[0]["lr"] = self.lr
 
         avg_loss = torch.stack([x["train_loss"] for x in outputs]).mean()
         tensorboard_logs = {
@@ -156,14 +157,14 @@ class PEPITATrainer(pl.LightningModule):
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 
-        err = self.model.Bs(self.forward(self.image)-self.label)
-        modulated = self.image - err 
+        # err = self.model.Bs(self.forward(self.image)-self.label)
+        # modulated = self.image - err 
 
-        with open(f"experiments/images/original_{self.current_epoch}.pkl", "wb") as f:
-            pickle.dump(self.image.cpu(), f)
+        # with open(f"experiments/images/original_{self.current_epoch}.pkl", "wb") as f:
+        #     pickle.dump(self.image.cpu(), f)
 
-        with open(f"experiments/images/modulated_{self.current_epoch}.pkl", "wb") as f:
-            pickle.dump(modulated.cpu(), f)
+        # with open(f"experiments/images/modulated_{self.current_epoch}.pkl", "wb") as f:
+        #     pickle.dump(modulated.cpu(), f)
 
 
     def validation_step(self, batch, batch_idx):
