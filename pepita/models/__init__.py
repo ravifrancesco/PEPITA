@@ -44,7 +44,7 @@ def modelpool(MODELNAME, hparams):
             fc_layer_size=fc_layer_size,
             n_classes=n_classes,
             img_shape=(img_w, img_w),
-            fc_dropout_p=hparams.TRAINING.DROPOUT_P,
+            dropout_p=hparams.TRAINING.DROPOUT_P,
             init=hparams.MODEL.FCNet.LAYER_INIT,  # FIXME same for conv
             B_init=hparams.PEPITA.B_INIT,
             B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 

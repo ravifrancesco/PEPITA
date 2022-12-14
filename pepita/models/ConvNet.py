@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 
 from pepita.models.layers.RandomFeedback import RandomFeedback
+from pepita.models.layers.ConsistentDropout import ConsistentDropoutNd
 
 from pepita.models.FCnet import (
     initialize_layer,
@@ -18,32 +19,39 @@ from pepita.models.FCnet import (
 
 
 @torch.no_grad()
-def generate_conv_layer(in_size, out_size, kernel=3, stride=1, padding=0, final_layer=False, init="he_uniform"):
+def generate_conv_layer(
+        in_size, out_size, p=0.0,
+        kernel=3, stride=1, padding=0,
+        init="he_uniform"):
     r"""Helper function to generate a Fully Connected block
 
     Args:
         in_size (int): input size
         out_size (int): output size
-        p (float, optional): dropout rate (default is 0.1)
-        final_layer (bool, optional): if True, the layer is treated as final layer (default is False)
+        p (float, optional): dropout rate (default is 0.0)
+        kernel, stride, padding: as in torch Conv2d implementation
         init (str, optional): initialization mode (default is 'he_uniform')
     Returns:
-        Fully connected block (nn.Sequential): fully connected block of the specified dimensions
+        Convolutional block (nn.Sequential): fully connected block of the specified dimensions
     """
     w = nn.Conv2d(in_size, out_size, kernel_size=kernel,
             stride=stride, padding=padding, bias=False)
     u = nn.Unfold(kernel_size=(kernel, kernel), stride=(stride, stride), padding=(padding, padding))
     initialize_layer(w, in_size, init)
+    a = nn.ReLU()
 
-    if final_layer:
-        a = nn.Softmax(dim=1)
+    if p:
+        dropout = ConsistentDropoutNd(p=p)
+        return nn.Sequential(w, a, dropout), u
     else:
-        a = nn.ReLU()
-    return nn.Sequential(w, a), u
+        return nn.Sequential(w, a), u
 
 
 class ConvNet(FCNet):
-    r"""Fully connected network
+    r"""A convolutional network model for PEPITA.
+    The number of convolutional layers is arbitrary. The current implementation has a Dropout and a Flatten
+    operation after the last convolution, and then an output Linear layer.
+    Currently, kernel size is hardcoded to 3 and stride to 2.
 
     Attributes:
         layers (nn.Module): layers of the network
@@ -58,7 +66,7 @@ class ConvNet(FCNet):
         fc_layer_size,
         n_classes,
         img_shape,
-        fc_dropout_p=0.,
+        dropout_p=0.,
         init="he_uniform",
         B_init="uniform",
         B_mean_zero=True,
@@ -67,7 +75,11 @@ class ConvNet(FCNet):
     ):
         r"""
         Args:
-            layer_sizes (list[int]): sizes of each layers
+            conv_channels (list[int]): number of channels for each convolutional layer. Determines no. of conv layers
+            fc_layer_size (int): number of units in the fc layer after flattening (determined by input size and last conv size)
+            n_classes (int): size of output
+            img_shape (tuple[int]): height and width of the input
+            dropout_p (float): dropout probability. Dropout is applied channel-wise after the last convolution (before flatten.)
             init (str, optional): layer initialization mode (default is 'he_uniform')
             B_init (str, optional): B initialization mode (default is 'uniform')
             B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
@@ -76,23 +88,20 @@ class ConvNet(FCNet):
             final_layer (bool, optional): if True, the last layer is treated as the last layer of the network (default is True)
         """
         nn.Module.__init__(self)
-        self.fc_dropout_p = fc_dropout_p
 
         # Generating network
         # Convolutional stack
         layers_list, self.unfold_objects = [], []
-        for in_size, out_size in zip(conv_channels, conv_channels[1:]):
+        for i, (in_size, out_size) in enumerate(zip(conv_channels, conv_channels[1:])):
+            p = dropout_p if i == len(conv_channels) - 2 else 0.0  # LAST element has dropout
             conv, unfold = generate_conv_layer(
-                in_size, out_size, kernel=3, init=init, stride=2, padding=1)
+                in_size, out_size, p=p, kernel=3, init=init, stride=2, padding=1)
             layers_list.append(conv)
             self.unfold_objects.append(unfold)
         self.conv_layers = nn.Sequential(*layers_list)
         self.weights = [layer[0].weight for layer in self.conv_layers]
 
         # Final layers
-        # layers_list.append(nn.Flatten())
-        # if fc_dropout_p:
-        #     layers_list.append(nn.Dropout(p=fc_dropout_p))
         self.linear = generate_layer(
             fc_layer_size, n_classes, p=False, final_layer=final_layer, init=init)
         self.weights.append(self.linear[0].weight)
@@ -106,7 +115,9 @@ class ConvNet(FCNet):
         # Generating B
         layer_sizes = (conv_channels[0]*img_shape[0]*img_shape[1], n_classes)  # TODO this could be done better
         input_shape = (conv_channels[0], *img_shape)
-        self.Bs = RandomFeedback(layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd, input_shape=input_shape)
+        self.Bs = RandomFeedback(
+            layer_sizes, init=B_init, B_mean_zero=B_mean_zero,
+            Bstd=Bstd, input_shape=input_shape)
 
     @torch.no_grad()
     def forward(self, x):
@@ -119,8 +130,6 @@ class ConvNet(FCNet):
             output (torch.Tensor): the network output
         """
         x = self.conv_layers(x)
-        if self.fc_dropout_p:
-            raise NotImplementedError("Dropout 2d is not available.")
         x = torch.flatten(x, start_dim=1)
         return self.linear(x)
 
@@ -152,11 +161,6 @@ class ConvNet(FCNet):
         output_activations = forward_activations if output_mode == "forward" else modulated_activations
         hl_err = x if output_mode == "forward" else inp_err
 
-        # if len(self.layers) == 1:  # limit case of one layer, just delta rule
-        #     raise NotImplementedError("Untested")
-        #     dwl = e.T @ x
-        #     self.layers[0][0].weight.grad = dwl / batch_size
-
         if output_mode == "mixed":
             raise NotImplementedError()
         else:  # original Pepita
@@ -176,7 +180,7 @@ class ConvNet(FCNet):
 
             # for the linear layer
             input_term = output_activations[-2]  # check
-            input_term = torch.flatten(input_term, start_dim=1) # TODO also add dropout here when available
+            input_term = torch.flatten(input_term, start_dim=1)
             dwl = e.T @ input_term
             self.linear[0].weight.grad = dwl / batch_size
 

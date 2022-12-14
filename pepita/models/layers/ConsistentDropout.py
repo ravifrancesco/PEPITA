@@ -66,3 +66,19 @@ class ConsistentDropout(nn.Module):
             return torch.mul(input, self.mask)
         else:
             return input
+
+
+class ConsistentDropoutNd(ConsistentDropout):
+    def _create_mask(self, input):
+        r"""Creates the mask by drawing from Bernoulli distribution with probability p
+
+        Args:
+            input (torch.Tensor): input
+
+        Returns:
+            mask (torch.Tensor): dropout mask
+        """
+        mask_shape = list(input.shape)
+        mask_shape[2:] = [1] * len(mask_shape[2:])
+        mask = torch.empty(mask_shape, dtype=torch.bool).bernoulli_(1-self.p) / (1-self.p)
+        return mask
