@@ -37,7 +37,7 @@ def modelpool(MODELNAME, hparams):
 
     elif MODELNAME.lower() == "convnet":
         hidden_layers = hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES  # FIXME same for conv
-        fc_layer_size = 8192  # FIXME this should be an extra parameter, or could be inferred from img size
+        fc_layer_size = 4096  # FIXME this should be an extra parameter, or could be inferred from img size
         conv_layers_channels = [n_chan] + hidden_layers
         model = ConvNet(
             conv_channels=conv_layers_channels,

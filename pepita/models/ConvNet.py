@@ -76,35 +76,53 @@ class ConvNet(FCNet):
             final_layer (bool, optional): if True, the last layer is treated as the last layer of the network (default is True)
         """
         nn.Module.__init__(self)
+        self.fc_dropout_p = fc_dropout_p
 
         # Generating network
         # Convolutional stack
-        self.layers_list, self.unfold_objects = [], []
+        layers_list, self.unfold_objects = [], []
         for in_size, out_size in zip(conv_channels, conv_channels[1:]):
             conv, unfold = generate_conv_layer(
                 in_size, out_size, kernel=3, init=init, stride=2, padding=1)
-            self.layers_list.append(conv)
+            layers_list.append(conv)
             self.unfold_objects.append(unfold)
+        self.conv_layers = nn.Sequential(*layers_list)
+        self.weights = [layer[0].weight for layer in self.conv_layers]
 
         # Final layers
-        self.layers_list.append(nn.Flatten())
-        if fc_dropout_p:
-            self.layers_list.append(nn.Dropout(p=fc_dropout_p))
-        self.layers_list.append(generate_layer(
-            fc_layer_size, n_classes, p=False, final_layer=final_layer, init=init
-        ))
-
-        self.layers = nn.Sequential(*self.layers_list)
-        # self.weights = [layer[0].weight for layer in self.layers]
-        self.activations = [None] * len(self.layers)
- 
-        for l, layer in enumerate(self.layers):
+        # layers_list.append(nn.Flatten())
+        # if fc_dropout_p:
+        #     layers_list.append(nn.Dropout(p=fc_dropout_p))
+        self.linear = generate_layer(
+            fc_layer_size, n_classes, p=False, final_layer=final_layer, init=init)
+        self.weights.append(self.linear[0].weight)
+        
+        # Hooks for recording activity
+        self.activations = [None] * (len(self.conv_layers) + 1) # +1 is the linear 
+        for l, layer in enumerate(self.conv_layers):
             layer.register_forward_hook(collect_activations(self, l))
+        self.linear.register_forward_hook(collect_activations(self, l+1))
 
         # Generating B
         layer_sizes = (conv_channels[0]*img_shape[0]*img_shape[1], n_classes)  # TODO this could be done better
         input_shape = (conv_channels[0], *img_shape)
         self.Bs = RandomFeedback(layer_sizes, init=B_init, B_mean_zero=B_mean_zero, Bstd=Bstd, input_shape=input_shape)
+
+    @torch.no_grad()
+    def forward(self, x):
+        r"""Computes the forward pass and returns the output
+
+        Args:
+            x (torch.Tensor): the input
+
+        Returns:
+            output (torch.Tensor): the network output
+        """
+        x = self.conv_layers(x)
+        if self.fc_dropout_p:
+            raise NotImplementedError("Dropout 2d is not available.")
+        x = torch.flatten(x, start_dim=1)
+        return self.linear(x)
 
     @torch.no_grad()
     def modulated_forward(self, x, y, target, batch_size, output_mode="modulated"):
@@ -134,28 +152,18 @@ class ConvNet(FCNet):
         output_activations = forward_activations if output_mode == "forward" else modulated_activations
         hl_err = x if output_mode == "forward" else inp_err
 
-        if len(self.layers) == 1:  # limit case of one layer, just delta rule
-            dwl = e.T @ x
-            self.layers[0][0].weight.grad = dwl / batch_size
+        # if len(self.layers) == 1:  # limit case of one layer, just delta rule
+        #     raise NotImplementedError("Untested")
+        #     dwl = e.T @ x
+        #     self.layers[0][0].weight.grad = dwl / batch_size
 
         if output_mode == "mixed":
             raise NotImplementedError()
-            # for l, layer in enumerate(self.layers):
-            #     if l == len(self.layers) - 1:
-            #         dwl = y.T @ forward_activations[l - 1] - target.T @ modulated_activations[l - 1]
-            #     elif l == 0:
-            #         dwl = forward_activations[l].T @ x - modulated_activations[l].T @ hl_err
-            #     else:
-            #         dwl = (
-            #             forward_activations[l].T @ forward_activations[l - 1] -
-            #             modulated_activations[l].T @ modulated_activations[l - 1]
-            #         )
-            #     layer[0].weight.grad = dwl / batch_size
-
         else:  # original Pepita
-            for l, layer in enumerate(self.layers):
+            # for convolutional layers
+            for l, layer in enumerate(self.conv_layers):
                 input_term = output_activations[l - 1] if l != 0 else hl_err
-                output_term = e if l == len(self.layers) - 1 else (forward_activations[l] - modulated_activations[l])
+                output_term = (forward_activations[l] - modulated_activations[l])
                 unfolded_in = self.unfold_objects[l](input_term)
                 k_h, k_w = self.unfold_objects[l].kernel_size
 
@@ -166,9 +174,21 @@ class ConvNet(FCNet):
                 dwl = torch.einsum("bcijhw, bkhw -> kcij", unfolded_in, output_term)
                 layer[0].weight.grad = dwl / batch_size
 
+            # for the linear layer
+            input_term = output_activations[-2]  # check
+            input_term = torch.flatten(input_term, start_dim=1) # TODO also add dropout here when available
+            dwl = e.T @ input_term
+            self.linear[0].weight.grad = dwl / batch_size
+
         self.reset_dropout_masks()
 
         return modulated_forward
+
+    @torch.no_grad()
+    def compute_angle(self):
+        """Fake placeholder function."""
+        angles = {"al_total": 0.}
+        return angles
 
     # @torch.no_grad()
     # def mirror_weights(self, batch_size, noise_amplitude=0.1):
@@ -199,7 +219,6 @@ class ConvNet(FCNet):
 
     #     self.reset_dropout_masks()
 
-    
     # @torch.no_grad()
     # def normalize_B(self):
     #     r"""Normalizes Bs to keep std constant"""
@@ -224,14 +243,6 @@ class ConvNet(FCNet):
     #     return weights
 
     # @torch.no_grad()
-    # def get_weights_norm(self):
-    #     r"""Returns dict with norms of weight matrixes"""
-    #     d = {}
-    #     for i, w in enumerate(self.weights):
-    #         d[f"layer{i}"] = torch.linalg.norm(w)
-    #     return d
-
-    # @torch.no_grad()
     # def get_B_norm(self):
     #     r"""Returns dict with norms of weight matrixes"""
     #     d = {}
@@ -239,19 +250,3 @@ class ConvNet(FCNet):
     #         d[f"layer{i}"] = torch.linalg.norm(b)
     #     return d
 
-    # @torch.no_grad()
-    # def compute_angle(self):
-    #     r"""Returns alignment dictionary between feedforward and feedback matrices"""
-    #     cost = 1 - spatial.distance.cosine(
-    #         self.get_tot_weights().T.cpu().flatten(), self.get_B().cpu().flatten()
-    #     )
-    #     angt = np.arccos(cost) * 180 / np.pi
-    #     angles = {"al_total": angt}
-    #     if len(self.get_Bs()) > 1:
-    #         for l, b in enumerate(self.get_Bs()):
-    #             cos = 1 - spatial.distance.cosine(
-    #                 self.weights[l].T.cpu().flatten(), b.cpu().flatten()
-    #             )
-    #             ang = np.arccos(cos) * 180 / np.pi
-    #             angles[f"al_layer{l}"] = ang
-    #     return angles
