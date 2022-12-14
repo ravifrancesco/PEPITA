@@ -10,6 +10,7 @@ import torch.nn as nn
 
 from pepita.models.layers.ConsistentDropout import ConsistentDropout
 from pepita.models.layers.RandomFeedback import RandomFeedback
+from pepita.models.layers.Normalization import Normalization
 
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
 
@@ -35,7 +36,7 @@ def initialize_layer(layer, in_size, init="he_uniform"):
 
 
 @torch.no_grad()
-def generate_layer(in_size, out_size, p=0.1, final_layer=False, init="he_uniform"):
+def generate_layer(in_size, out_size, p=0.1, normalization=False, final_layer=False, init="he_uniform"):
     r"""Helper function to generate a Fully Connected block
 
     Args:
@@ -56,7 +57,8 @@ def generate_layer(in_size, out_size, p=0.1, final_layer=False, init="he_uniform
     else:
         d = ConsistentDropout(p=p)
         a = nn.ReLU()
-        return nn.Sequential(w, d, a)
+        n = Normalization()
+        return nn.Sequential(w, d, a, n) if normalization else nn.Sequential(w, d, a)
 
 
 @torch.no_grad()
@@ -95,6 +97,7 @@ class FCNet(nn.Module):
         B_mean_zero=True,
         Bstd=0.05,
         p=0.1,
+        normalization=False,
         final_layer=True,
     ):
         r"""
@@ -111,7 +114,7 @@ class FCNet(nn.Module):
 
         # Generating network
         self.layers_list = [
-            generate_layer(in_size, out_size, p=p, init=init)
+            generate_layer(in_size, out_size, p=p, normalization=normalization, init=init)
             for in_size, out_size in zip(layer_sizes, layer_sizes[1:-1])
         ]
 
@@ -121,6 +124,7 @@ class FCNet(nn.Module):
                 layer_sizes[-2],
                 layer_sizes[-1],
                 p=p,
+                normalization=normalization,
                 final_layer=final_layer,
                 init=init,
             )

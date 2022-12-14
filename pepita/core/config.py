@@ -8,7 +8,7 @@ import os
 sys.path.append("")
 
 ### CONSTANTS ###
-DATASET_DIR = {"MNIST": "datasets", "CIFAR10": "datasets", "CIFAR100": "datasets"}
+DATASET_DIR = {"MNIST": "../../datasets", "CIFAR10": "../../datasets", "CIFAR100": "../../datasets"}
 
 ### CONFIGS ###
 hparams = CN()
@@ -59,6 +59,7 @@ hparams.MODEL = CN()
 hparams.MODEL.FCNet = CN()
 hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024]
 hparams.MODEL.FCNet.LAYER_INIT = "he_normal"
+hparams.MODEL.FCNet.NORMALIZATION = False
 
 
 def get_hparams_defaults():

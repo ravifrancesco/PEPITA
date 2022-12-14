@@ -30,7 +30,8 @@ def modelpool(MODELNAME, hparams):
                 B_init=hparams.PEPITA.B_INIT,
                 B_mean_zero=hparams.PEPITA.B_MEAN_ZERO, 
                 Bstd=hparams.PEPITA.BSTD,
-                p=hparams.TRAINING.DROPOUT_P
+                p=hparams.TRAINING.DROPOUT_P,
+                normalization=hparams.MODEL.FCNet.NORMALIZATION,
             )
         return model, input_size, n_classes, True
     else:

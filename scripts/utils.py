@@ -46,6 +46,7 @@ def create_arg_cfg(args):
     cfg.MODEL.FCNet = CN()
     cfg.MODEL.FCNet.HIDDEN_LAYER_SIZES = args.layer_sizes
     cfg.MODEL.FCNet.LAYER_INIT = args.layer_init
+    cfg.MODEL.FCNet.NORMALIZATION = args.normalize_activations
 
     return cfg
 
@@ -93,6 +94,7 @@ def create_grid_search_dict(args):
             "FCNet" : {
                 "HIDDEN_LAYER_SIZES" : args.layer_sizes,
                 "LAYER_INIT" : args.layer_init,
+                "NORMALIZATION" : args.normalize_activations,
             }
         },
 

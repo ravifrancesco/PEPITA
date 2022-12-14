@@ -64,7 +64,7 @@ def main(cfg_dict, n_cpus=4, n_gpus=1, resume=False):
         mode="max",
         num_samples=1,
         config=cfg_dict,
-        scheduler=asha_scheduler,
+        # scheduler=asha_scheduler,
         name=cfg_dict['EXP_NAME'],
         local_dir=f"experiments",
         max_failures=5,
@@ -142,6 +142,8 @@ if __name__ == '__main__':
     parser.add_argument('-prm', '--pre_mirror', nargs='*', type=int, default=[0], help="Number of epochs of pre mirroring")
     parser.add_argument('-mir', '--mirror', nargs='*', type=int, default=[200], help="How often to perform weight mirroring")
     parser.add_argument('-md', '--mode', type=str, default="modulated", help="Modulated pass mode")
+    parser.add_argument('-na', '--normalize_activations', action='store_true', help='normalize activations')
+
 
 
     args = parser.parse_args()
@@ -151,3 +153,5 @@ if __name__ == '__main__':
     ray.init(num_cpus=args.cpus, num_gpus=args.gpus)
 
     main(cfg_dict, n_cpus=args.cpus, n_gpus=args.gpus, resume=args.resume)
+
+    ray.shutdown()
