@@ -42,6 +42,11 @@ class RandomFeedback(nn.Module):
                 B = torch.empty(size0, size1).normal_(mean=0, std=(sd / (el ** (1.0 / 2.0))) ** (1.0 / n)
                     )
                 self.Bs.append(B)
+        elif init.lower() == "normal_sing":
+            sd = np.sqrt(2.0 / layer_sizes[0]) * Bstd
+            B = torch.empty(layer_sizes[0], layer_sizes[-1]).normal_(mean=0, std=sd)
+            self.Bs.append(B)
+            logger.info(f"Generated feedback matrix with shape {self.Bs[0].shape}")
         else:
             logger.error(f"B initialization '{init.lower()}' is not valid ")
             exit(-1)

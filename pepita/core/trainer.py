@@ -117,13 +117,16 @@ class PEPITATrainer(pl.LightningModule):
 
     def training_epoch_end(self, outputs):
 
+        opt_w, opt_b = self.optimizers()
+
         if self.current_epoch in self.hparams.TRAINING.DECAY_EPOCH:
             logger.info(
                 f"Epoch {self.current_epoch} - Learning rate decay: {self.lr} -> {self.lr*self.lr_decay}"
             )
             self.lr = self.lr * self.lr_decay
-            opt_w, opt_b = self.optimizers()
             opt_w.param_groups[0]["lr"] = self.lr
+        # if self.current_epoch in [30, 60, 90]:
+        #     opt_b.param_groups[0]["lr"] *= 0.5
 
         avg_loss = torch.stack([x["train_loss"] for x in outputs]).mean()
         tensorboard_logs = {
@@ -132,7 +135,9 @@ class PEPITATrainer(pl.LightningModule):
             "angle": self.model.compute_angle(),
             "weight_norms": self.model.get_weights_norm(),
             "step": self.current_epoch,
-            # "b_norms" : self.model.get_B_norm(),
+            "b_std" : torch.std(self.model.get_B()),
+            "b_mean" : torch.mean(self.model.get_B()),
+            "b_norm" : torch.linalg.norm(self.model.get_B()),
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 

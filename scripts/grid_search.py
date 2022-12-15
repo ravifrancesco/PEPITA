@@ -131,7 +131,7 @@ if __name__ == '__main__':
     parser.add_argument('-bs', '--batch_size', type=int, default=64, help="Momentum")
     parser.add_argument('-au', '--augment', action='store_true', help='Data augmentation')
     parser.add_argument('-lrd', '--decay', nargs='*', type=float, default=[0.1], help="Learning rate decay")
-    parser.add_argument('-de', '--decay_epoch', type=int, nargs='+', action='append', help='Learning rate decay epochs', default=[[60,90]])
+    parser.add_argument('-de', '--decay_epoch', type=int, action='append', help='Learning rate decay epochs', default=[[60,90]])
     parser.add_argument('-li', '--layer_init', type=str, help="Layer init mode", default='he_normal')
     parser.add_argument('-bi', '--b_init', type=str, help="B init mode", default='normal')
     parser.add_argument('-bm', '--b_mean_zero', action='store_false', help="Mean of B is 0")

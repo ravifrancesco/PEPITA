@@ -242,20 +242,29 @@ class FCNet(nn.Module):
         """
 
         if len(self.weights) != len(self.get_Bs()):
-            logger.error("The B initialization is not valid for performing mirroring")
-            exit()
-
-        for l, layer in enumerate(self.layers):
             noise_x = noise_amplitude * (
-                torch.randn(batch_size, self.weights[l].shape[1])
+                torch.randn(batch_size, self.weights[0].shape[1])
             )
             noise_x -= torch.mean(noise_x).item()
-            device = next(layer.parameters()).device
+            device = next(self.layers[0].parameters()).device
             noise_x = noise_x.to(device)
-            noise_y = layer(noise_x)
+            noise_y = self.forward(noise_x)
             # update the backward weight matrices using the equation 7 of the paper manuscript
             update = noise_x.T @ noise_y / batch_size
-            self.get_Bs()[l].grad = -update.cpu()
+            self.get_Bs()[0].grad = -update.cpu()
+
+        else:
+            for l, layer in enumerate(self.layers):
+                noise_x = noise_amplitude * (
+                    torch.randn(batch_size, self.weights[l].shape[1])
+                )
+                noise_x -= torch.mean(noise_x).item()
+                device = next(layer.parameters()).device
+                noise_x = noise_x.to(device)
+                noise_y = layer(noise_x)
+                # update the backward weight matrices using the equation 7 of the paper manuscript
+                update = noise_x.T @ noise_y / batch_size
+                self.get_Bs()[l].grad = -update.cpu()
 
         self.reset_dropout_masks()
 
