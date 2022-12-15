@@ -114,10 +114,10 @@ class ConvNet(FCNet):
 
         # Generating B
         layer_sizes = (conv_channels[0]*img_shape[0]*img_shape[1], n_classes)  # TODO this could be done better
-        input_shape = (conv_channels[0], *img_shape)
+        self.input_shape = (conv_channels[0], *img_shape)
         self.Bs = RandomFeedback(
             layer_sizes, init=B_init, B_mean_zero=B_mean_zero,
-            Bstd=Bstd, input_shape=input_shape)
+            Bstd=Bstd, input_shape=self.input_shape)
 
     @torch.no_grad()
     def forward(self, x):
@@ -194,49 +194,22 @@ class ConvNet(FCNet):
         angles = {"al_total": 0.}
         return angles
 
-    # @torch.no_grad()
-    # def mirror_weights(self, batch_size, noise_amplitude=0.1):
-    #     r"""Perform weight mirroring
+    @torch.no_grad()
+    def mirror_weights(self, batch_size, noise_amplitude=0.1):
+        r"""Perform weight mirroring
 
-    #     Args:
-    #         batch_size (int): batch size
-    #         noise_amplitude (float, optional): noise amplitude (default is 0.1)
-    #         wmlr (float, optional): learning rate (default is 0.01)
-    #         wmwd (float, optional): weigth decay (default is 0.0001)
-    #     """
-
-    #     if len(self.weights) != len(self.get_Bs()):
-    #         logger.error("The B initialization is not valid for performing mirroring")
-    #         exit()
-
-    #     for l, layer in enumerate(self.layers):
-    #         noise_x = noise_amplitude * (
-    #             torch.randn(batch_size, self.weights[l].shape[1])
-    #         )
-    #         noise_x -= torch.mean(noise_x).item()
-    #         device = next(layer.parameters()).device
-    #         noise_x = noise_x.to(device)
-    #         noise_y = layer(noise_x)
-    #         # update the backward weight matrices using the equation 7 of the paper manuscript
-    #         update = noise_x.T @ noise_y / batch_size
-    #         self.get_Bs()[l].grad = -update.cpu()
-
-    #     self.reset_dropout_masks()
-
-    # @torch.no_grad()
-    # def normalize_B(self):
-    #     r"""Normalizes Bs to keep std constant"""
-    #     self.Bs.normalize_B()
-
-    # @torch.no_grad()
-    # def get_B(self):
-    #     r"""Returns B (from output to input)"""
-    #     return self.Bs.get_B()
-
-    # @torch.no_grad()
-    # def get_Bs(self):
-    #     r"""Returns Bs"""
-    #     return self.Bs.get_Bs()
+        Args:
+            batch_size (int): batch size
+            noise_amplitude (float, optional): noise amplitude (default is 0.1)
+        """
+        device = next(self.conv_layers[0].parameters()).device
+        noise_x = noise_amplitude * torch.randn(batch_size, *self.input_shape, device=device)
+        noise_x -= torch.mean(noise_x).item()
+        noise_y = self.forward(noise_x)
+        # update the backward weight matrices using the equation 7 of the paper manuscript
+        update = noise_x.reshape((batch_size, -1)).T @ noise_y / batch_size
+        self.get_Bs()[0].grad = -update.cpu()
+        self.reset_dropout_masks()
 
     # @torch.no_grad()
     # def get_tot_weights(self):
