@@ -128,7 +128,7 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', nargs='*', type=float, default=[0.01], help="Learning rate")
     parser.add_argument('-wd', '--weight_decay', nargs='*', type=float, default=[0.0001], help="Weight decay")
     parser.add_argument('-mom', '--momentum', nargs='*', type=float, default=[0.9], help="Learning rate")
-    parser.add_argument('-bs', '--batch_size', type=int, default=64, help="Momentum")
+    parser.add_argument('-bs', '--batch_size', nargs='*', type=int, default=[64], help="Batch size")
     parser.add_argument('-au', '--augment', action='store_true', help='Data augmentation')
     parser.add_argument('-lrd', '--decay', nargs='*', type=float, default=[0.1], help="Learning rate decay")
     parser.add_argument('-de', '--decay_epoch', type=int, nargs='+', action='append', help='Learning rate decay epochs', default=[[60,90]])
@@ -144,13 +144,11 @@ if __name__ == '__main__':
     parser.add_argument('-md', '--mode', type=str, default="modulated", help="Modulated pass mode")
     parser.add_argument('-na', '--normalize_activations', action='store_true', help='normalize activations')
 
-
-
     args = parser.parse_args()
 
     cfg_dict = create_grid_search_dict(args)
 
-    ray.init(num_cpus=args.cpus, num_gpus=args.gpus)
+    ray.init(address="local", num_cpus=args.cpus, num_gpus=args.gpus)
 
     main(cfg_dict, n_cpus=args.cpus, n_gpus=args.gpus, resume=args.resume)
 

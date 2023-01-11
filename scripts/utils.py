@@ -73,7 +73,7 @@ def create_grid_search_dict(args):
             "LR" : tune.grid_search(args.learning_rate),
             "WD" : tune.grid_search(args.weight_decay),
             "MOMENTUM" : tune.grid_search(args.momentum),
-            "BATCH_SIZE" : args.batch_size,
+            "BATCH_SIZE" : tune.grid_search(args.batch_size),
             "AUGMENT" : args.augment,
             "LR_DECAY" : tune.grid_search(args.decay),
             "DECAY_EPOCH" : tune.grid_search(args.decay_epoch),
