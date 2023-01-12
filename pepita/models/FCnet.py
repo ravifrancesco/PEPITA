@@ -56,7 +56,7 @@ def generate_layer(in_size, out_size, p=0.1, normalization=False, final_layer=Fa
         return nn.Sequential(w, a)
     else:
         d = ConsistentDropout(p=p)
-        a = nn.Tanh()
+        a = nn.ReLU() # a = nn.Tanh()
         n = Normalization()
         return nn.Sequential(w, d, a, n) if normalization else nn.Sequential(w, d, a)
 
