@@ -250,8 +250,9 @@ class FCNet(nn.Module):
                     dwl = e.T @ output_activations[l - 1]
                 else:
                     dwl = (forward_activations[l] - modulated_activations[l]).T @ (
-                        output_activations[l - 1] if l != 0 else hl_err
+                         output_activations[l - 1] if l != 0 else hl_err
                     )
+                    # dwl = (layer[0].weight @ self.Bs(e).T) * ((layer[0].weight @ x.T)>0) @ x
                 layer[0].weight.grad = dwl / batch_size
 
         self.reset_dropout_masks()

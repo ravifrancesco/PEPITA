@@ -8,7 +8,7 @@ import os
 sys.path.append("")
 
 ### CONSTANTS ###
-DATASET_DIR = {"MNIST": "datasets", "CIFAR10": "datasets", "CIFAR100": "datasets"}
+DATASET_DIR = {"MNIST": "../../../datasets", "CIFAR10": "../../../datasets", "CIFAR100": "../../../datasets"}
 
 ### CONFIGS ###
 hparams = CN()
