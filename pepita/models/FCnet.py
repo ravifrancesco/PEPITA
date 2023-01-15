@@ -237,8 +237,6 @@ class FCNet(nn.Module):
         Args:
             batch_size (int): batch size
             noise_amplitude (float, optional): noise amplitude (default is 0.1)
-            wmlr (float, optional): learning rate (default is 0.01)
-            wmwd (float, optional): weigth decay (default is 0.0001)
         """
 
         if len(self.weights) != len(self.get_Bs()):
