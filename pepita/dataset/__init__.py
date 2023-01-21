@@ -2,7 +2,7 @@ from loguru import logger
 
 from .getdataloader import *
 
-def datapool(DATANAME, batchsize, val_split=0.2, augment=False, num_workers=8, normalize=False):
+def datapool(DATANAME, batchsize, ds_directory='datasets', val_split=0.2, augment=False, num_workers=8, normalize=False):
     r"""Return the training and testing dataloaders of the given dataset
 
     Args:
@@ -17,11 +17,11 @@ def datapool(DATANAME, batchsize, val_split=0.2, augment=False, num_workers=8, n
     """
 
     if DATANAME.lower() == 'mnist':
-        return get_mnist(batchsize, val_split=val_split, augment=augment, num_workers=num_workers, normalize=normalize)
+        return get_mnist(batchsize, val_split=val_split, augment=augment, num_workers=num_workers, normalize=normalize, ds_directory=ds_directory)
     elif DATANAME.lower() == 'cifar10':
-        return get_cifar10(batchsize, val_split=val_split, augment=augment, num_workers=num_workers, normalize=normalize)
+        return get_cifar10(batchsize, val_split=val_split, augment=augment, num_workers=num_workers, normalize=normalize, ds_directory=ds_directory)
     elif DATANAME.lower() == 'cifar100':
-        return get_cifar100(batchsize, val_split=val_split, augment=augment, num_workers=num_workers, normalize=normalize)
+        return get_cifar100(batchsize, val_split=val_split, augment=augment, num_workers=num_workers, normalize=normalize, ds_directory=ds_directory)
     else:
         logger.error(f'Dataset \'{DATANAME.lower()}\' is not supported yet')
         exit()

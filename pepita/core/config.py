@@ -7,19 +7,17 @@ import os
 
 sys.path.append("")
 
-### CONSTANTS ###
-DATASET_DIR = {"MNIST": "../../../datasets", "CIFAR10": "../../../datasets", "CIFAR100": "../../../datasets"}
-
 ### CONFIGS ###
 hparams = CN()
 
 # General settings
-hparams.EXP_NAME = "cifar10_fcnet_nodropout"
+hparams.EXP_NAME = "test"
 hparams.MODEL_DIR = f"experiments/{hparams.EXP_NAME}/model"
 hparams.LOG_DIR = f"experiments/{hparams.EXP_NAME}/logs"
 hparams.CONFIG_PATH = f"experiments/{hparams.EXP_NAME}"
 hparams.MODEL_ARCH = "fcnet"
 hparams.DATASET = "CIFAR10"
+hparams.DS_DIRECTORY = "datasets"
 hparams.SEED_VALUE = 42
 
 # Hardware
@@ -75,6 +73,7 @@ def update_paths(hparams):
     """
     hparams.MODEL_DIR = f"experiments/{hparams.EXP_NAME}/model"
     hparams.LOG_DIR = f"experiments/{hparams.EXP_NAME}/logs"
+    hparams.CONFIG_PATH = f"experiments/{hparams.EXP_NAME}"
     hparams.CONFIG_PATH = f"experiments/{hparams.EXP_NAME}"
 
 

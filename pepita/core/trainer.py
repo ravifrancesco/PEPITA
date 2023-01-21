@@ -38,10 +38,12 @@ class PEPITATrainer(pl.LightningModule):
         ) = datapool(
             self.hparams.DATASET,
             self.hparams.TRAINING.BATCH_SIZE,
+            self.hparams.DS_DIRECTORY,
             val_split=self.hparams.TRAINING.VAL_SPLIT,
             augment=self.hparams.TRAINING.AUGMENT,
             num_workers=self.hparams.HARDWARE.NUM_WORKERS,
             normalize=self.hparams.TRAINING.NORMALIZE,
+
         )
 
         # Loading model
@@ -93,9 +95,13 @@ class PEPITATrainer(pl.LightningModule):
             outputs = self.forward(imgs, first=True)
 
             if self.mode=='mixed_tl':
-                _, _, opt_w2 = self.optimizers()
-                opt_w2.step()
-                opt_w2.zero_grad()
+                # _, _, opt_w2 = self.optimizers()
+                # opt_w2.step()
+                # opt_w2.zero_grad()
+                opt_w, _, _ = self.optimizers()
+                opt_w.step()
+                opt_w.zero_grad()
+                
 
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
@@ -153,7 +159,10 @@ class PEPITATrainer(pl.LightningModule):
             "angle": self.model.compute_angle(),
             "weight_norms": self.model.get_weights_norm(),
             "step": self.current_epoch,
-            # "b_norms" : self.model.get_B_norm(),
+            # "b_std" : torch.std(self.model.get_B()),
+            # "b_stds_1" : torch.std(self.model.get_Bs()[0]),
+            # "b_stds_2" : torch.std(self.model.get_Bs()[1]),
+            # "b_stds_3" : torch.std(self.model.get_Bs()[2])
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
 

@@ -15,6 +15,7 @@ def create_arg_cfg(args):
     cfg.EXP_NAME = args.exp_name
     cfg.MODEL_ARCH = args.arch
     cfg.DATASET = args.dataset
+    cfg.DS_DIRECTORY = args.ds_directory
     cfg.SEED_VALUE = args.seed if args.seed else random.randint(0, 4294967295)
 
     cfg.HARDWARE = CN()
@@ -60,6 +61,7 @@ def create_grid_search_dict(args):
         "EXP_NAME" : args.exp_name,
         "MODEL_ARCH" : args.arch,
         "DATASET" : args.dataset,
+        "DS_DIRECTORY": args.ds_directory,
         "SEED_VALUE" : args.seed if args.seed else random.randint(0, 4294967295),
 
         "HARDWARE" : {

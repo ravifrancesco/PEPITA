@@ -56,8 +56,9 @@ class RandomFeedback(nn.Module):
     def normalize_B(self):
         r"""Normalizes Bs to keep std constant"""
         std = np.sqrt(2.0 / self.fan_in) * self.Bstd
+        B = self.get_B()
         for l in range(len(self.Bs)):
-            self.Bs[l] *= torch.sqrt(std / torch.std(self.get_B()))
+            self.Bs[l] *= (std / torch.std(B)) ** (1 / len(self.Bs)) # TODO std / torch.std(self.get_B()[l]) // torch.sqrt(std / torch.std(self.get_B()))
 
     @torch.no_grad()
     def get_Bs(self):

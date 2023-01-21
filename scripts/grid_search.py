@@ -64,7 +64,7 @@ def main(cfg_dict, n_cpus=4, n_gpus=1, resume=False):
         mode="max",
         num_samples=1,
         config=cfg_dict,
-        # scheduler=asha_scheduler,
+        scheduler=asha_scheduler,
         name=cfg_dict['EXP_NAME'],
         local_dir=f"experiments",
         max_failures=5,
@@ -120,6 +120,7 @@ if __name__ == '__main__':
     parser.add_argument('-a', '--arch', type=str, default='fcnet', help="Model architecture")
     parser.add_argument('-ls', '--layer_sizes', nargs='*', type=int, default=[1024], help="sizes of the layers")
     parser.add_argument('-d', '--dataset', type=str, default='cifar10', help="Dataset")
+    parser.add_argument('-ddir', '--ds_directory', type=str, help="Dataset directory", default='datasets')
     parser.add_argument('-s', '--seed', type=int, help="Seed value")
     parser.add_argument('-w', '--workers', type=int, default=4, help="Number of workers")
     parser.add_argument('-e', '--epochs', type=int, default=100, help="Number of epochs")
