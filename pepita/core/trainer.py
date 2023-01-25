@@ -70,24 +70,11 @@ class PEPITATrainer(pl.LightningModule):
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
 
-        images, labels = iter(self.train_dataloader()).next()
-        self.image = images[0].reshape(-1, self.input_size).cuda()
-        self.label = labels[0].cuda()
-
     def forward(self, x, first=True):
         return self.model(x, x.shape[0], output_mode=self.mode, first=first)
 
     def training_step(self, batch, batch_idx):
         with torch.no_grad():
-
-            # err = self.model.Bs(self.forward(self.image)-self.label)
-            # modulated = self.image - err 
-
-            # with open(f"experiments/images/original_{batch_idx}.pkl", "wb") as f:
-            #     pickle.dump(self.image.cpu(), f)
-
-            # with open(f"experiments/images/modulated_{batch_idx}.pkl", "wb") as f:
-            #     pickle.dump(modulated.cpu(), f)
 
             imgs, gt = batch
             if self.reshape:
@@ -95,10 +82,7 @@ class PEPITATrainer(pl.LightningModule):
             outputs = self.forward(imgs, first=True)
 
             if self.mode=='mixed_tl':
-                # _, _, opt_w2 = self.optimizers()
-                # opt_w2.step()
-                # opt_w2.zero_grad()
-                opt_w, _, _ = self.optimizers()
+                opt_w, _ = self.optimizers()
                 opt_w.step()
                 opt_w.zero_grad()
                 
@@ -119,7 +103,7 @@ class PEPITATrainer(pl.LightningModule):
             loss = F.cross_entropy(outputs, gt)
             self.train_acc(torch.argmax(outputs, -1), gt)
 
-            opt_w, _, _ = self.optimizers()
+            opt_w, _ = self.optimizers()
             opt_w.step()
             opt_w.zero_grad()
 
@@ -129,7 +113,7 @@ class PEPITATrainer(pl.LightningModule):
                 or not (self.current_epoch + 1) % self.mirror
             ):
                 self.model.mirror_weights(imgs.shape[0])
-                _, opt_b, _ = self.optimizers()
+                _, opt_b = self.optimizers()
                 opt_b.step()
                 opt_b.zero_grad()
 
@@ -148,9 +132,8 @@ class PEPITATrainer(pl.LightningModule):
                 f"Epoch {self.current_epoch} - Learning rate decay: {self.lr} -> {self.lr*self.lr_decay}"
             )
             self.lr = self.lr * self.lr_decay
-            opt_w, opt_b, opt_w2 = self.optimizers()
+            opt_w, opt_b = self.optimizers()
             opt_w.param_groups[0]["lr"] = self.lr
-            opt_w2.param_groups[0]["lr"] = self.lr
 
         avg_loss = torch.stack([x["train_loss"] for x in outputs]).mean()
         tensorboard_logs = {
@@ -159,21 +142,12 @@ class PEPITATrainer(pl.LightningModule):
             "angle": self.model.compute_angle(),
             "weight_norms": self.model.get_weights_norm(),
             "step": self.current_epoch,
-            # "b_std" : torch.std(self.model.get_B()),
-            # "b_stds_1" : torch.std(self.model.get_Bs()[0]),
-            # "b_stds_2" : torch.std(self.model.get_Bs()[1]),
-            # "b_stds_3" : torch.std(self.model.get_Bs()[2])
+            "b_std" : torch.std(self.model.get_B()),
+            "b_stds": self.model.get_B_std(),
+            "b_mean" : torch.mean(self.model.get_B()),
+            "b_means": self.model.get_B_means()
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
-
-        # err = self.model.Bs(self.forward(self.image)-self.label)
-        # modulated = self.image - err 
-
-        # with open(f"experiments/images/original_{self.current_epoch}.pkl", "wb") as f:
-        #     pickle.dump(self.image.cpu(), f)
-
-        # with open(f"experiments/images/modulated_{self.current_epoch}.pkl", "wb") as f:
-        #     pickle.dump(modulated.cpu(), f)
 
 
     def validation_step(self, batch, batch_idx):
@@ -228,16 +202,12 @@ class PEPITATrainer(pl.LightningModule):
         )
         # optimizer for feedback matrices
         opt_b = torch.optim.SGD(self.model.get_Bs(), lr=self.wmlr, weight_decay=self.wmwd)
-        opt_w2 = torch.optim.SGD(
-            self.parameters(), lr=self.lr, momentum=self.mom, weight_decay=self.wd
-        )
-        return opt_w, opt_b, opt_w2
+        return opt_w, opt_b
 
     def train_dataloader(self):
         return self.train_dataloader_v
 
     def val_dataloader(self):
-        # return self.val_dataloader_v FIXME change
         return self.test_dataloader_v
 
     def test_dataloader(self):

@@ -43,6 +43,7 @@ def generate_layer(in_size, out_size, p=0.1, normalization=False, final_layer=Fa
         in_size (int): input size
         out_size (int): output size
         p (float, optional): dropout rate (default is 0.1)
+        normalization (bool, optional): if True, hidden layers activations are normalized (default is False)
         final_layer (bool, optional): if True, the layer is treated as final layer (default is False)
         init (str, optional): initialization mode (default is 'he_uniform')
     Returns:
@@ -108,6 +109,7 @@ class FCNet(nn.Module):
             B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
             Bstd (float, optional): standard deviation of the entries of the matrix (default is 0.05)
             p (float, optional): dropout rate (default is 0.1)
+            normalization (bool, optional): if True, hidden layers activations are normalized (default is False)
             final_layer (bool, optional): if True, the last layer is treated as the last layer of the network (default is True)
         """
         super(FCNet, self).__init__()
@@ -185,6 +187,7 @@ class FCNet(nn.Module):
                 else:
                     dwl = forward_activations[l].T @ forward_activations[l - 1]
                 layer[0].weight.grad = dwl / batch_size
+                self.reset_dropout_masks()
 
         return out
 
@@ -194,14 +197,17 @@ class FCNet(nn.Module):
 
         Args:
             x (torch.Tensor): the network input
-            e (torch.Tensor): the error computed at the output after the first forward pass
+            y (torch.Tensor): output from the first forward pass
+            target (torch.Tensor): target for the current input
             batch_size (int): the batch size
             output_mode (str): One of "forward", "modulated", "mixed". Indicates whether \
                 to use the first or second forward pass for the output term in the learning \
                 rule, or split the terms and use one each (fully Hebbian - fully anti-Hebbian).
+            output_mode (optional, str): variations of the PEPITA learning rule (default is "modulated")
 
         Returns:
-            modulated_forward (torch.Tensor): modulated output
+            forward_activations (torch.Tensor): forward pass activations
+            modulated_activations (torch.Tensor): modulated forward pass activations
         """
 
         assert output_mode in ("modulated", "forward", "mixed", "mixed_tl"), "Output mode not recognized"
@@ -252,12 +258,15 @@ class FCNet(nn.Module):
                     dwl = (forward_activations[l] - modulated_activations[l]).T @ (
                          output_activations[l - 1] if l != 0 else hl_err
                     )
-                    # dwl = (layer[0].weight @ self.Bs(e).T) * ((layer[0].weight @ x.T)>0) @ x
+                    # dl = (self.layers[0][0].weight @ self.Bs(e).T) * ((self.layers[0][0].weight @ x.T)>0)
+                    # for i in range(1, l):
+                    #     dl = (self.layers[i][0].weight.T @ dl) * ((self.layers[i][0].weight @ output_activations[0].T)>0)
+                    # dwl = dl @ x if l==0 else output_activations[i-1]
                 layer[0].weight.grad = dwl / batch_size
 
         self.reset_dropout_masks()
 
-        return modulated_forward
+        return forward_activations, modulated_activations
 
     @torch.no_grad()
     def mirror_weights(self, batch_size, noise_amplitude=0.1):
@@ -266,8 +275,6 @@ class FCNet(nn.Module):
         Args:
             batch_size (int): batch size
             noise_amplitude (float, optional): noise amplitude (default is 0.1)
-            wmlr (float, optional): learning rate (default is 0.01)
-            wmwd (float, optional): weigth decay (default is 0.0001)
         """
 
         if len(self.weights) != len(self.get_Bs()):
@@ -314,15 +321,31 @@ class FCNet(nn.Module):
 
     @torch.no_grad()
     def get_weights_norm(self):
-        r"""Returns dict with norms of weight matrixes"""
+        r"""Returns dict with norms of weight matrices"""
         d = {}
         for i, w in enumerate(self.weights):
             d[f"layer{i}"] = torch.linalg.norm(w)
         return d
 
     @torch.no_grad()
+    def get_B_std(self):
+        r"""Returns dict with std of feedback matrices"""
+        d = {}
+        for i, b in enumerate(self.get_Bs()):
+            d[f"layer{i}"] = torch.std(b)
+        return d
+
+    @torch.no_grad()
+    def get_B_means(self):
+        r"""Returns dict with means of feedback matrices"""
+        d = {}
+        for i, b in enumerate(self.get_Bs()):
+            d[f"layer{i}"] = torch.mean(b)
+        return d
+
+    @torch.no_grad()
     def get_B_norm(self):
-        r"""Returns dict with norms of weight matrixes"""
+        r"""Returns dict with norms of feedback matrices"""
         d = {}
         for i, b in enumerate(self.get_Bs()):
             d[f"layer{i}"] = torch.linalg.norm(b)
