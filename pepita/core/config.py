@@ -7,19 +7,17 @@ import os
 
 sys.path.append("")
 
-### CONSTANTS ###
-DATASET_DIR = {"CIFAR10": "../../datasets", "CIFAR100": "../../datasets"}
-
 ### CONFIGS ###
 hparams = CN()
 
 # General settings
-hparams.EXP_NAME = "cifar10_fcnet_nodropout"
+hparams.EXP_NAME = "test"
 hparams.MODEL_DIR = f"experiments/{hparams.EXP_NAME}/model"
 hparams.LOG_DIR = f"experiments/{hparams.EXP_NAME}/logs"
 hparams.CONFIG_PATH = f"experiments/{hparams.EXP_NAME}"
 hparams.MODEL_ARCH = "fcnet"
 hparams.DATASET = "CIFAR10"
+hparams.DS_DIRECTORY = "datasets"
 hparams.SEED_VALUE = 42
 
 # Hardware
@@ -59,6 +57,7 @@ hparams.MODEL = CN()
 hparams.MODEL.FCNet = CN()
 hparams.MODEL.FCNet.HIDDEN_LAYER_SIZES = [1024]
 hparams.MODEL.FCNet.LAYER_INIT = "he_normal"
+hparams.MODEL.FCNet.NORMALIZATION = False
 
 
 def get_hparams_defaults():
@@ -74,6 +73,7 @@ def update_paths(hparams):
     """
     hparams.MODEL_DIR = f"experiments/{hparams.EXP_NAME}/model"
     hparams.LOG_DIR = f"experiments/{hparams.EXP_NAME}/logs"
+    hparams.CONFIG_PATH = f"experiments/{hparams.EXP_NAME}"
     hparams.CONFIG_PATH = f"experiments/{hparams.EXP_NAME}"
 
 

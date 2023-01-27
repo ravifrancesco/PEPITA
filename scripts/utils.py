@@ -15,6 +15,7 @@ def create_arg_cfg(args):
     cfg.EXP_NAME = args.exp_name
     cfg.MODEL_ARCH = args.arch
     cfg.DATASET = args.dataset
+    cfg.DS_DIRECTORY = args.ds_directory
     cfg.SEED_VALUE = args.seed if args.seed else random.randint(0, 4294967295)
 
     cfg.HARDWARE = CN()
@@ -46,6 +47,7 @@ def create_arg_cfg(args):
     cfg.MODEL.FCNet = CN()
     cfg.MODEL.FCNet.HIDDEN_LAYER_SIZES = args.layer_sizes
     cfg.MODEL.FCNet.LAYER_INIT = args.layer_init
+    cfg.MODEL.FCNet.NORMALIZATION = args.normalize_activations
 
     return cfg
 
@@ -59,6 +61,7 @@ def create_grid_search_dict(args):
         "EXP_NAME" : args.exp_name,
         "MODEL_ARCH" : args.arch,
         "DATASET" : args.dataset,
+        "DS_DIRECTORY": args.ds_directory,
         "SEED_VALUE" : args.seed if args.seed else random.randint(0, 4294967295),
 
         "HARDWARE" : {
@@ -72,7 +75,7 @@ def create_grid_search_dict(args):
             "LR" : tune.grid_search(args.learning_rate),
             "WD" : tune.grid_search(args.weight_decay),
             "MOMENTUM" : tune.grid_search(args.momentum),
-            "BATCH_SIZE" : args.batch_size,
+            "BATCH_SIZE" : tune.grid_search(args.batch_size),
             "AUGMENT" : args.augment,
             "LR_DECAY" : tune.grid_search(args.decay),
             "DECAY_EPOCH" : tune.grid_search(args.decay_epoch),
@@ -93,6 +96,7 @@ def create_grid_search_dict(args):
             "FCNet" : {
                 "HIDDEN_LAYER_SIZES" : args.layer_sizes,
                 "LAYER_INIT" : args.layer_init,
+                "NORMALIZATION" : args.normalize_activations,
             }
         },
 
