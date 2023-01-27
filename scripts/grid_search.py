@@ -142,12 +142,12 @@ if __name__ == '__main__':
     parser.add_argument('-prm', '--pre_mirror', nargs='*', type=int, default=[0], help="Number of epochs of pre mirroring")
     parser.add_argument('-mir', '--mirror', nargs='*', type=int, default=[200], help="How often to perform weight mirroring")
     parser.add_argument('-md', '--mode', type=str, default="modulated", help="Modulated pass mode")
-
+    parser.add_argument('-add', '--address', type=str, help="Ray node address", default='local')
 
     args = parser.parse_args()
 
     cfg_dict = create_grid_search_dict(args)
 
-    ray.init(num_cpus=args.cpus, num_gpus=args.gpus)
+    ray.init(address=args.address, num_cpus=args.cpus, num_gpus=args.gpus)
 
     main(cfg_dict, n_cpus=args.cpus, n_gpus=args.gpus, resume=args.resume)
