@@ -162,7 +162,7 @@ class FCNet(nn.Module):
     def reset_dropout_masks(self):
         r"""Resets dropout masks"""
         for module in self.modules():
-            if module.__class__ is ConsistentDropout:
+            if isinstance(module, ConsistentDropout):
                 module.reset_mask()
 
     @torch.no_grad()
