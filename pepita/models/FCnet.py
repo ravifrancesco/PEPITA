@@ -10,6 +10,7 @@ import torch.nn as nn
 
 from pepita.models.layers.ConsistentDropout import ConsistentDropout
 from pepita.models.layers.RandomFeedback import RandomFeedback
+from pepita.models.layers.Normalization import Normalization
 
 # code adapted from https://github.com/avicooper1/CPSC490/blob/main/pepita.ipynb
 
@@ -35,13 +36,14 @@ def initialize_layer(layer, in_size, init="he_uniform"):
 
 
 @torch.no_grad()
-def generate_layer(in_size, out_size, p=0.1, final_layer=False, init="he_uniform"):
+def generate_layer(in_size, out_size, p=0.1, normalization=False, final_layer=False, init="he_uniform"):
     r"""Helper function to generate a Fully Connected block
 
     Args:
         in_size (int): input size
         out_size (int): output size
         p (float, optional): dropout rate (default is 0.1)
+        normalization (bool, optional): if True, hidden layers activations are normalized (default is False)
         final_layer (bool, optional): if True, the layer is treated as final layer (default is False)
         init (str, optional): initialization mode (default is 'he_uniform')
     Returns:
@@ -55,8 +57,9 @@ def generate_layer(in_size, out_size, p=0.1, final_layer=False, init="he_uniform
         return nn.Sequential(w, a)
     else:
         d = ConsistentDropout(p=p)
-        a = nn.ReLU()
-        return nn.Sequential(w, d, a)
+        a = nn.ReLU() # a = nn.Tanh()
+        n = Normalization()
+        return nn.Sequential(w, d, a, n) if normalization else nn.Sequential(w, d, a)
 
 
 @torch.no_grad()
@@ -95,6 +98,7 @@ class FCNet(nn.Module):
         B_mean_zero=True,
         Bstd=0.05,
         p=0.1,
+        normalization=False,
         final_layer=True,
     ):
         r"""
@@ -105,13 +109,14 @@ class FCNet(nn.Module):
             B_mean_zero (bool, optional): if True, the distribution of the entries is centered around 0 (default is True)
             Bstd (float, optional): standard deviation of the entries of the matrix (default is 0.05)
             p (float, optional): dropout rate (default is 0.1)
+            normalization (bool, optional): if True, hidden layers activations are normalized (default is False)
             final_layer (bool, optional): if True, the last layer is treated as the last layer of the network (default is True)
         """
         super(FCNet, self).__init__()
 
         # Generating network
         self.layers_list = [
-            generate_layer(in_size, out_size, p=p, init=init)
+            generate_layer(in_size, out_size, p=p, normalization=normalization, init=init)
             for in_size, out_size in zip(layer_sizes, layer_sizes[1:-1])
         ]
 
@@ -121,6 +126,7 @@ class FCNet(nn.Module):
                 layer_sizes[-2],
                 layer_sizes[-1],
                 p=p,
+                normalization=normalization,
                 final_layer=final_layer,
                 init=init,
             )
@@ -160,7 +166,7 @@ class FCNet(nn.Module):
                 module.reset_mask()
 
     @torch.no_grad()
-    def forward(self, x):
+    def forward(self, x, batch_size, output_mode="modulated", first=False): # TODO doc
         r"""Computes the forward pass and returns the output
 
         Args:
@@ -169,31 +175,49 @@ class FCNet(nn.Module):
         Returns:
             output (torch.Tensor): the network output
         """
-        return self.layers(x)
+        out = self.layers(x)
+
+        if output_mode == "mixed_tl" and first:
+            forward_activations = self.get_activations()
+            for l, layer in enumerate(self.layers):
+                if l == len(self.layers) - 1:
+                    dwl = out.T @ forward_activations[l - 1]
+                elif l == 0:
+                    dwl = forward_activations[l].T @ x
+                else:
+                    dwl = forward_activations[l].T @ forward_activations[l - 1]
+                layer[0].weight.grad = dwl / batch_size
+                self.reset_dropout_masks()
+
+        return out
 
     @torch.no_grad()
-    def modulated_forward(self, x, y, target, batch_size, output_mode="modulated"):
+    def modulated_forward(self, x, y, target, batch_size, output_mode="modulated"): # TODO doc
         r"""Updates the layers gradient according to the PEPITA learning rule (https://arxiv.org/pdf/2201.11665.pdf)
 
         Args:
             x (torch.Tensor): the network input
-            e (torch.Tensor): the error computed at the output after the first forward pass
+            y (torch.Tensor): output from the first forward pass
+            target (torch.Tensor): target for the current input
             batch_size (int): the batch size
             output_mode (str): One of "forward", "modulated", "mixed". Indicates whether \
                 to use the first or second forward pass for the output term in the learning \
                 rule, or split the terms and use one each (fully Hebbian - fully anti-Hebbian).
+            output_mode (optional, str): variations of the PEPITA learning rule (default is "modulated")
 
         Returns:
-            modulated_forward (torch.Tensor): modulated output
+            forward_activations (torch.Tensor): forward pass activations
+            modulated_activations (torch.Tensor): modulated forward pass activations
         """
 
-        assert output_mode in ("modulated", "forward", "mixed"), "Output mode not recognized"
-
+        assert output_mode in ("modulated", "forward", "mixed", "mixed_tl"), "Output mode not recognized"
+        
+        target = target.float()
         e = y - target
         inp_err = x - self.Bs(e)
 
         forward_activations = self.get_activations()
-        modulated_forward = self.forward(inp_err)
+        modulated_forward = self.forward(inp_err, batch_size, output_mode, first=False)
         modulated_activations = self.get_activations()
 
         output_activations = forward_activations if output_mode == "forward" else modulated_activations
@@ -215,6 +239,16 @@ class FCNet(nn.Module):
                         modulated_activations[l].T @ modulated_activations[l - 1]
                     )
                 layer[0].weight.grad = dwl / batch_size
+        
+        if output_mode == "mixed_tl":
+            for l, layer in enumerate(self.layers):
+                if l == len(self.layers) - 1:
+                    dwl = target.T @ modulated_activations[l - 1]
+                elif l == 0:
+                    dwl = modulated_activations[l].T @ hl_err
+                else:
+                    dwl =  modulated_activations[l].T @ modulated_activations[l - 1]
+                layer[0].weight.grad = - dwl / batch_size
 
         else:  # original Pepita
             for l, layer in enumerate(self.layers):
@@ -222,13 +256,17 @@ class FCNet(nn.Module):
                     dwl = e.T @ output_activations[l - 1]
                 else:
                     dwl = (forward_activations[l] - modulated_activations[l]).T @ (
-                        output_activations[l - 1] if l != 0 else hl_err
+                         output_activations[l - 1] if l != 0 else hl_err
                     )
+                    # dl = (self.layers[0][0].weight @ self.Bs(e).T) * ((self.layers[0][0].weight @ x.T)>0)
+                    # for i in range(1, l):
+                    #     dl = (self.layers[i][0].weight.T @ dl) * ((self.layers[i][0].weight @ output_activations[0].T)>0)
+                    # dwl = dl @ x if l==0 else output_activations[i-1]
                 layer[0].weight.grad = dwl / batch_size
 
         self.reset_dropout_masks()
 
-        return modulated_forward
+        return forward_activations, modulated_activations
 
     @torch.no_grad()
     def mirror_weights(self, batch_size, noise_amplitude=0.1):
@@ -237,8 +275,6 @@ class FCNet(nn.Module):
         Args:
             batch_size (int): batch size
             noise_amplitude (float, optional): noise amplitude (default is 0.1)
-            wmlr (float, optional): learning rate (default is 0.01)
-            wmwd (float, optional): weigth decay (default is 0.0001)
         """
 
         if len(self.weights) != len(self.get_Bs()):
@@ -285,15 +321,31 @@ class FCNet(nn.Module):
 
     @torch.no_grad()
     def get_weights_norm(self):
-        r"""Returns dict with norms of weight matrixes"""
+        r"""Returns dict with norms of weight matrices"""
         d = {}
         for i, w in enumerate(self.weights):
             d[f"layer{i}"] = torch.linalg.norm(w)
         return d
 
     @torch.no_grad()
+    def get_B_std(self):
+        r"""Returns dict with std of feedback matrices"""
+        d = {}
+        for i, b in enumerate(self.get_Bs()):
+            d[f"layer{i}"] = torch.std(b)
+        return d
+
+    @torch.no_grad()
+    def get_B_means(self):
+        r"""Returns dict with means of feedback matrices"""
+        d = {}
+        for i, b in enumerate(self.get_Bs()):
+            d[f"layer{i}"] = torch.mean(b)
+        return d
+
+    @torch.no_grad()
     def get_B_norm(self):
-        r"""Returns dict with norms of weight matrixes"""
+        r"""Returns dict with norms of feedback matrices"""
         d = {}
         for i, b in enumerate(self.get_Bs()):
             d[f"layer{i}"] = torch.linalg.norm(b)

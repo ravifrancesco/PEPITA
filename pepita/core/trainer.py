@@ -17,6 +17,7 @@ from pepita.models import modelpool
 from ..dataset import datapool, get_data_info
 from . import config
 
+import pickle
 
 class PEPITATrainer(pl.LightningModule):
     r"""Class for training models using the PEPITA algorithm"""
@@ -37,10 +38,12 @@ class PEPITATrainer(pl.LightningModule):
         ) = datapool(
             self.hparams.DATASET,
             self.hparams.TRAINING.BATCH_SIZE,
+            self.hparams.DS_DIRECTORY,
             val_split=self.hparams.TRAINING.VAL_SPLIT,
             augment=self.hparams.TRAINING.AUGMENT,
             num_workers=self.hparams.HARDWARE.NUM_WORKERS,
             normalize=self.hparams.TRAINING.NORMALIZE,
+
         )
 
         # Loading model
@@ -67,21 +70,28 @@ class PEPITATrainer(pl.LightningModule):
         self.train_acc = torchmetrics.Accuracy()
         self.val_acc = torchmetrics.Accuracy()
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, x, first=True):
+        return self.model(x, x.shape[0], output_mode=self.mode, first=first)
 
     def training_step(self, batch, batch_idx):
         with torch.no_grad():
+
             imgs, gt = batch
             if self.reshape:
                 imgs = imgs.reshape(-1, self.input_size)
-            outputs = self(imgs)
+            outputs = self.forward(imgs, first=True)
+
+            if self.mode=='mixed_tl':
+                opt_w, _ = self.optimizers()
+                opt_w.step()
+                opt_w.zero_grad()
+                
 
             one_hot = F.one_hot(gt, num_classes=self.n_classes)
 
             # Compute modulated activations
             if self.current_epoch >= self.premirror:
-                self.model.modulated_forward(imgs, outputs, one_hot, imgs.shape[0])
+                self.model.modulated_forward(imgs, outputs, one_hot, imgs.shape[0], output_mode=self.mode)
 
             # Perform weight mirroring
             if (
@@ -132,9 +142,13 @@ class PEPITATrainer(pl.LightningModule):
             "angle": self.model.compute_angle(),
             "weight_norms": self.model.get_weights_norm(),
             "step": self.current_epoch,
-            # "b_norms" : self.model.get_B_norm(),
+            "b_std" : torch.std(self.model.get_B()),
+            "b_stds": self.model.get_B_std(),
+            "b_mean" : torch.mean(self.model.get_B()),
+            "b_means": self.model.get_B_means()
         }
         self.log_dict(tensorboard_logs, prog_bar=True, on_step=False, on_epoch=True)
+
 
     def validation_step(self, batch, batch_idx):
         with torch.no_grad():
@@ -194,7 +208,6 @@ class PEPITATrainer(pl.LightningModule):
         return self.train_dataloader_v
 
     def val_dataloader(self):
-        # return self.val_dataloader_v FIXME change
         return self.test_dataloader_v
 
     def test_dataloader(self):
