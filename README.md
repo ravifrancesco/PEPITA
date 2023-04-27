@@ -2,7 +2,7 @@
 
 To download the repository locally, please download the file `PEPITA.zip`
 
-Example of usage:
+## Example of usage
 
 * 1 Hidden layer: `python scripts/train.py -en test_1 -d cifar100 -ls 1024 -wd 0.0 -bi uniform -li he_uniform`
 * 2 Hidden layers: `python scripts/train.py -en test_2 -d cifar100 -ls 1024 1024 -wd 0.0 -bi uniform -li he_uniform`
